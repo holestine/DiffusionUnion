@@ -163,3 +163,4 @@ cython_debug/
 # App Specific
 history/
 background.png
+notes.txt

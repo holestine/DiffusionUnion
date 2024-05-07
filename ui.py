@@ -5,6 +5,7 @@ import time, os
 from diffusers import AutoPipelineForInpainting
 from diffusers.utils import load_image, make_image_grid
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Disable warning, may be bug in some versions of PyTorch
 torch.backends.cudnn.enabled = False
@@ -12,17 +13,24 @@ torch.backends.cudnn.enabled = False
 class DiffusionUnionUI:
     def __init__(self, root, background=None):
         self.root = root
-        self.background_path = background
+        
+        # Window title
         self.root.title("Diffusion Union")
+        
+        # Create a 512x512 black image to start with if a background isn't specified
+        if background == None:
+            self.width, self.height = 512, 512
+            background = 'history/{}.png'.format(time.time())
+            Image.fromarray(np.zeros((self.width,self.height,3), 'uint8')).save(background)
+
+        self.background_path = background
         self.history = []
 
-        if background:
-            self.canvas_bg = PhotoImage(file=background)
-            self.bg_png = load_image(background)
-            self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
-            self.history.append(background)
-        else:
-            self.width, self.height = 512, 512
+        self.canvas_bg = PhotoImage(file=background)
+        self.bg_png = load_image(background)
+        self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
+        self.history.append(background)
+
 
         # Create a left and right frame
         left_frame = Frame(root, width=self.width, height=self.height, bg='grey')
@@ -33,10 +41,8 @@ class DiffusionUnionUI:
         
         # Create canvas for drawing mask
         self.canvas = Canvas(left_frame, bg="black", width=self.width, height=self.height)
-        self.canvas.pack(fill=BOTH, expand=True)
-
-        if self.background_path:
-            self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
+        self.canvas.pack(fill=BOTH, expand=False)
+        self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
 
         # Create a grayscale image the same size as the canvas to track mask creation
         # https://pillow.readthedocs.io/en/stable/handbook/concepts.html#concept-modes
@@ -67,7 +73,7 @@ class DiffusionUnionUI:
         self.thickness_label.pack(side=LEFT, fill=Y, expand=FALSE)
 
         self.thickness = IntVar()
-        self.thickness.set('2')
+        self.thickness.set('20')
         options = [1,2,3,4,5,10,15,20]
         drop = OptionMenu(thickness_frame, self.thickness, *options)
         drop.pack(side=LEFT, fill=X, expand=TRUE)
@@ -79,7 +85,7 @@ class DiffusionUnionUI:
         self.model_label = Label(model_frame, text="Diffusion Model:", anchor=W)
         self.model_label.pack(side=LEFT, fill=Y, expand=FALSE)
 
-        self.model = StringVar(model_frame, "")
+        self.model = StringVar(model_frame, "Kandinsky 2.2")
 
         model_options = ["Stable Diffusion", "Stable Diffusion XL", "Kandinsky 2.2"]
         model_drop = OptionMenu(model_frame, self.model, *model_options)
@@ -166,7 +172,7 @@ class DiffusionUnionUI:
         # Get all necessary arguments from UI
         prompt = self.prompt.get('1.0', 'end-1 chars')
         negative_prompt = self.negative_prompt.get('1.0', 'end-1 chars') 
-        init_image = load_image(self.background_path)
+        init_image = load_image(self.history[-1])
         model_name = self.model.get()
 
         if model_name == "Stable Diffusion":
@@ -232,6 +238,7 @@ class DiffusionUnionUI:
         
 if __name__ == "__main__":
     root = Tk()
-    app = DiffusionUnionUI(root, "background.png")
+    #app = DiffusionUnionUI(root, "background.png")
+    app = DiffusionUnionUI(root)
     root.mainloop()
 
