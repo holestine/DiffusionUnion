@@ -10,6 +10,7 @@ from diffusers import AutoPipelineForInpainting
 import torch
 import os, time
 import numpy as np
+from tkVideoPlayer import TkinterVideo
 
 class image_to_vid:
     
@@ -32,7 +33,7 @@ class image_to_vid:
 
         # Create left frame
         left_frame = Frame(parent, width=self.width, height=self.height, bg='grey')
-        left_frame.pack(side=LEFT, fill=BOTH, expand=FALSE)
+        left_frame.pack(side=LEFT, fill=BOTH, expand=TRUE)
 
         # Create right frame
         right_frame = Frame(parent, width=self.width, height=self.height, bg='grey')
@@ -41,6 +42,12 @@ class image_to_vid:
         return toolbar, left_frame, right_frame
 
     def initialize_canvas(self, left_frame):
+        self.videoplayer = TkinterVideo(master=left_frame, scaled=True)
+        self.videoplayer.pack(expand=True, fill="both")
+        self.videoplayer.load(r"generated.mp4")
+        self.videoplayer.play() # play the video
+
+        return
         # Create a black image for the background
         self.history.append('history/{}.png'.format(time.time()))
         Image.fromarray(np.zeros((self.width,self.height,3), 'uint8')).save(self.history[-1])
@@ -118,6 +125,12 @@ class image_to_vid:
             prompt = self.prompt.get('1.0', 'end-1 chars')
             video_frames = pipeline(prompt).frames[0]
             export_to_video(video_frames, "generated.mp4", fps=5)
+
+
+            
+            self.videoplayer.load(r"generated.mp4")
+            self.videoplayer.play() # play the video
+
 
         return
 
