@@ -15,6 +15,10 @@ DEBUG = FALSE
 class inpainting_ui:
 
     def __init__(self, parent, width=512, height=512):
+
+        # Efficient attention is not native in old PyTorch versions and is needed to reduce GPU usage
+        self.use_efficient_attention = int(torch.__version__.split('.')[0]) >= 2
+
         # Size of image to work with
         self.width = width
         self.height = height
@@ -29,8 +33,8 @@ class inpainting_ui:
 
         # Populate controls
         self.initialize_toolbar(toolbar)
-        self.initialize_canvas(left_frame)
         self.initialize_prompts(right_frame)
+        self.initialize_canvas(left_frame)
         self.update_controls()
 
         # State variables
@@ -67,7 +71,7 @@ class inpainting_ui:
         # Create text box for entering the prompt
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=FALSE)
         self.prompt = Text(parent, height=3, wrap=WORD)
-        self.prompt.insert(END, "a clandestine mystical city in the mountains surrounded by wildlife, bushes and trees near a waterfall and next to a rocky river during a lightning storm with a clear starry ski in the background, highly detailed, 8k, in a style similar to Tim Burton, realistic level of detail")
+        self.prompt.insert(END, "a clandestine mystical city in the mountains with bushes and trees near a waterfall and a rocky river during a lightning storm with a clear starry sky in the background, highly detailed, 8k, realistic")
         self.prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
 
         # Create text box for entering negative prompt
@@ -80,56 +84,46 @@ class inpainting_ui:
         
         # Create combo box for entering radius
         radius_frame = Frame(toolbar, bg='grey')
-        Hovertip(radius_frame,'Select the radius for the paintbrush used to draw the mask')
-        radius_frame.pack(side=LEFT, fill=X, expand=FALSE)
-
-        Label(radius_frame, text="Radius:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
-
         radius_options = [1,2,3,4,5,10,15,20,50,100]
-        self.radius = IntVar()
-        self.radius.set(radius_options[-1])        
+        self.radius = IntVar(radius_frame, radius_options[-1])
+        Hovertip(radius_frame, 'Select the radius for the paintbrush used to draw the mask')
+        Label(radius_frame, text="Radius:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
         OptionMenu(radius_frame, self.radius, *radius_options).pack(side=LEFT, fill=X, expand=TRUE)
+        radius_frame.pack(side=LEFT, fill=X, expand=FALSE)
 
         # Create combo box for entering the mask blur
         blur_frame = Frame(toolbar, bg='grey')
-        Hovertip(blur_frame,'Select the blur factor for the mask')
-        blur_frame.pack(side=LEFT, fill=X, expand=FALSE)
-
+        blur_options = [0,1,3,5,15,33,57]
+        self.blur = IntVar(blur_frame, blur_options[0])
+        Hovertip(blur_frame, 'Select the blur factor for the mask')
         Label(radius_frame, text="Blur Factor:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
-
-        blur_options = [0,1,2,3,4,5,10,15,20,50,100]
-        self.blur = IntVar()
-        self.blur.set(blur_options[0])
-        
         self.blur_options = OptionMenu(blur_frame, self.blur, *blur_options)
         self.blur_options.pack(side=LEFT, fill=X, expand=TRUE)
+        blur_frame.pack(side=LEFT, fill=X, expand=FALSE)
 
         # Create combo box for selecting diffusion model
-        model_frame = Frame(toolbar, bg='grey')
-        Hovertip(model_frame,'Select the diffusion model to use')
-        model_frame.pack(side=LEFT, fill=X, expand=FALSE)
-
-        Label(model_frame, text="Diffusion Model:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
-
-        model_options = ["Stable Diffusion", "Stable Diffusion XL", "Kandinsky 2.2"]
-        self.checkpoint = StringVar(model_frame, "Kandinsky 2.2")
-        self.checkpoint.trace_add("write", self.checkpoint_selection_callback)
+        checkpoint_frame = Frame(toolbar, bg='grey')
+        checkpoint_options = ["Stable Diffusion", "Stable Diffusion XL", "Kandinsky 2.2"]
+        self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
+        Hovertip(checkpoint_frame, 'Select the diffusion model to use')
+        Label(checkpoint_frame, text="Diffusion Model:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
+        OptionMenu(checkpoint_frame, self.checkpoint, *checkpoint_options).pack(side=LEFT, fill=X, expand=TRUE)
+        checkpoint_frame.pack(side=LEFT, fill=X, expand=FALSE)
+        self.checkpoint.trace_add("write", self.checkpoint_selection_callback) # Need to update UI when this changes
         
-        OptionMenu(model_frame, self.checkpoint, *model_options).pack(side=LEFT, fill=X, expand=TRUE)
-
         # Create a button to load a background
         self.load_button = Button(toolbar, text="Load Background", command=self.load_background)
-        Hovertip(self.load_button,'Open an image')
+        Hovertip(self.load_button, 'Open an image')
         self.load_button.pack(side=LEFT, fill=X, expand=FALSE)
 
         # Create a button to generate the image
         self.generate_button = Button(toolbar, text="Generate Image", command=self.generate)
-        Hovertip(self.generate_button,'Generate a new image')
+        Hovertip(self.generate_button, 'Generate a new image')
         self.generate_button.pack(side=LEFT, fill=X, expand=FALSE)
 
         # Create a button to clear canvas
-        self.clear_button = Button(toolbar, text="Clear Mask", command=self.clear_mask)
-        Hovertip(self.clear_button,'Clear the current mask')
+        self.clear_button = Button(toolbar, text="Clear Mask", command=self.refresh_canvas)
+        Hovertip(self.clear_button, 'Clear the current mask')
         self.clear_button.pack(side=LEFT, fill=X, expand=FALSE)
 
         # Create a button to increase the image's resolution
@@ -142,7 +136,6 @@ class inpainting_ui:
         Hovertip(self.undo_button,'Undo the last generated image')
         self.undo_button.pack(side=LEFT, fill=X, expand=FALSE)
         
-
     def checkpoint_selection_callback(self, *args):
         self.update_controls()
         
@@ -156,28 +149,40 @@ class inpainting_ui:
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
             self.blur_options['state'] = DISABLED
-            
+
         if len(self.history) > 1:
             self.undo_button["state"] = NORMAL
         else:
             self.undo_button["state"] = DISABLED
 
-    def undo(self):
-        self.history.pop()
-        self.canvas_bg = PhotoImage(file=self.history[-1])
-
+    def refresh_canvas(self):
         self.canvas.delete("all")
+        self.canvas_bg = PhotoImage(file=self.history[-1])
+        self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
+        self.canvas.config(width=self.width, height=self.height)
         self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
 
+        # Create a new mask to draw on
         self.mask = Image.new("L", (self.width, self.height))
         self.mask_editor = ImageDraw.Draw(self.mask)
 
         self.update_controls()
+
+    def update_canvas_image(self, image):
+        self.history.append('history/{}.png'.format(time.time()))
+        image.save(self.history[-1])
+        self.refresh_canvas()
+
+    def undo(self):
+        # Create new background from previous saved file
+        self.history.pop()
+        self.refresh_canvas()     
     
     def start_drawing(self, event):
         self.drawing = TRUE
 
     def draw(self, event):
+        # Draw a circle on the image and on the mask in the exact same location
         if self.drawing:
             x, y = event.x, event.y
             radius = self.radius.get()
@@ -188,10 +193,6 @@ class inpainting_ui:
 
     def stop_drawing(self, event):
         self.drawing = False
-
-    def clear_mask(self):
-        self.canvas.delete("all")
-        self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
 
     def super_res(self):
         threading.Thread(target=self.super_res_thread).start()
@@ -213,10 +214,12 @@ class inpainting_ui:
         except Exception as ex:
             print(ex)
             messagebox.showinfo("Error", ex.args[0]) 
-
     
     def generate(self):
-        threading.Thread(target=self.generate_thread).start()
+        if DEBUG:
+            self.generate_thread()
+        else:
+            threading.Thread(target=self.generate_thread).start()
 
     def generate_thread(self):
         # Get all necessary arguments from UI
@@ -230,34 +233,32 @@ class inpainting_ui:
                 "runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16, variant="fp16"
             )
             pipeline.enable_model_cpu_offload()
-            # Remove following line if xFormers is not installed or you have PyTorch 2.0 or higher installed
-            #pipeline.enable_xformers_memory_efficient_attention()
-            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=33)
+            if self.use_efficient_attention:
+                pipeline.enable_xformers_memory_efficient_attention()
+            blurred_mask = pipeline.mask_processor.blur(self.mask, blur_factor=self.blur.get())
             generator = torch.Generator("cuda").manual_seed(92)
-            image = pipeline(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
+            image = pipeline(prompt=prompt, image=init_image, mask_image=blurred_mask, generator=generator).images[0]
         elif model_name == "Stable Diffusion XL":
             pipeline = AutoPipelineForInpainting.from_pretrained(
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16"
             )
             pipeline.enable_model_cpu_offload()
-            # Remove following line if xFormers is not installed or you have PyTorch 2.0 or higher installed
-            #pipeline.enable_xformers_memory_efficient_attention()
+            if self.use_efficient_attention:
+                pipeline.enable_xformers_memory_efficient_attention()
             generator = torch.Generator("cuda").manual_seed(92)
-            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=33)
-            image = pipeline(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
+            blurred_mask = pipeline.mask_processor.blur(self.mask, blur_factor=self.blur.get())
+            image = pipeline(prompt=prompt, image=init_image, mask_image=blurred_mask, generator=generator).images[0]
         elif model_name == "Kandinsky 2.2":
             pipeline = AutoPipelineForInpainting.from_pretrained(
                 "kandinsky-community/kandinsky-2-2-decoder-inpaint", torch_dtype=torch.float16
             )
             pipeline.enable_model_cpu_offload()
-            # Remove following line if xFormers is not installed or you have PyTorch 2.0 or higher installed
-            #pipeline.enable_xformers_memory_efficient_attention()
+            if self.use_efficient_attention:
+                pipeline.enable_xformers_memory_efficient_attention()
             image = pipeline(prompt=prompt, negative_prompt=negative_prompt, image=init_image, mask_image=self.mask).images[0]
         else:
             print("Specify a supported model.\n")
             return
-        
-        self.update_canvas_image(image)
 
         # Use to validate inputs and outputs
         if DEBUG:
@@ -266,37 +267,11 @@ class inpainting_ui:
             print(model_name)
             plt.imshow(make_image_grid([init_image, self.mask, image], rows=1, cols=3))
             plt.show()
+
+        self.update_canvas_image(image)
         
-
-    def update_canvas_image(self, image):
-
-        self.history.append('history/{}.png'.format(time.time()))
-        image.save(self.history[-1])
-        self.canvas_bg = PhotoImage(file=self.history[-1])
-        
-        if len(self.history) > 1:
-            self.undo_button["state"] = NORMAL
-        else:
-            self.undo_button["state"] = DISABLED
-        
-        self.canvas.delete("all")
-        self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
-        self.canvas.config(width=self.width, height=self.height)
-        self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
-
-        self.mask = Image.new("L", (self.width, self.height))
-        self.mask_editor = ImageDraw.Draw(self.mask)
-
-
     def load_background(self):
         res = filedialog.askopenfile(initialdir="./history")
         if res:
-            self.canvas.delete("all")
             self.history.append(res.name)
-            self.canvas_bg = PhotoImage(file=self.history[-1])
-            self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
-            self.canvas.config(width=self.width, height=self.height)
-            self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
-
-            self.mask = Image.new("L", (self.width, self.height))
-            self.mask_editor = ImageDraw.Draw(self.mask)
+            self.refresh_canvas()
