@@ -36,7 +36,5 @@ This tab exposes the features of the Stable Diffisuion, Stable Diffusion XL and 
 ![](./assets/7.png)
 *And this is the full size 1024x1024 image from the history folder*
 
-
-
-
-![](./assets/mountain.png)|![](./assets/creature.png)|![](./assets/river_in_storm.png)|![](./assets/river_cat_1.png)|![](./assets/river_cat_2.png)
+Some other generated images
+|![](./assets/mountain.png)|![](./assets/creature.png)|![](./assets/river_in_storm.png)|![](./assets/river_cat_1.png)|![](./assets/river_cat_2.png)|
