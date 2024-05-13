@@ -162,6 +162,7 @@ cython_debug/
 
 # App Specific
 history/
+test_images/
 background.png
 notes.txt
 *.mp4
