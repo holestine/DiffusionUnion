@@ -11,7 +11,7 @@ import image_to_vid as i2v
 # Disable warning, may be bug in some versions of PyTorch
 torch.backends.cudnn.enabled = False
 
-DEBUG = FALSE
+DEV_MODE = FALSE
 
 class DiffusionUnionUI:
 
@@ -25,11 +25,11 @@ class DiffusionUnionUI:
         inpainting_tab = Frame(tabControl) 
         image_to_vid = Frame(tabControl) 
         tabControl.add(inpainting_tab, text ='Inpainting') 
-        tabControl.add(image_to_vid, text ='Image to Video') 
+        if DEV_MODE:
+            tabControl.add(image_to_vid, text ='Image to Video') 
+            
         tabControl.pack(expand=TRUE, fill=BOTH) 
         
-        
-
         ip.inpainting_ui(inpainting_tab)
         i2v.image_to_vid(image_to_vid)
         

@@ -23,7 +23,7 @@ class inpainting_ui:
     def __init__(self, parent, width=512, height=512):
 
         # Efficient attention is not native in old PyTorch versions and is needed to reduce GPU usage
-        self.use_efficient_attention = int(torch.__version__.split('.')[0]) >= 2
+        self.use_efficient_attention = int(torch.__version__.split('.')[0]) < 2
 
         # Size of image to work with
         self.width = width
@@ -70,20 +70,21 @@ class inpainting_ui:
         self.canvas.bind("<B1-Motion>",       self.draw)
         self.canvas.bind("<ButtonRelease-1>", self.stop_drawing)
 
-        # Make black background
+        # Make black background (tried noise but it didn't work as well (np.random.randint(0, 255, (self.height, self.width, 3), "uint8")))
         self.update_canvas_image(Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8')))
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
+        prompt = "a mountain town next to a ski resort surrounded by bushes and trees near a waterfall and a rocky river during a lightning storm with a clear starry sky in the background, highly detailed, 8k, realistic"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=FALSE)
         self.prompt = Text(parent, height=1, wrap=WORD)
-        self.prompt.insert(END, "a clandestine mystical city in the mountains with bushes and trees near a waterfall and a rocky river during a lightning storm with a clear starry sky in the background, highly detailed, 8k, realistic")
+        self.prompt.insert(END, prompt)
         self.prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
 
         # Create text box for entering negative prompt
         Label(parent, text="Negative Prompt:", anchor=W).pack(side=TOP, fill=X, expand=FALSE)
         self.negative_prompt = Text(parent, height=1, wrap=WORD)
-        self.negative_prompt.insert(END, "bad anatomy, deformed, ugly, normal")
+        self.negative_prompt.insert(END, "bad anatomy, deformed, ugly")
         self.negative_prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
 
     def initialize_toolbar(self, toolbar):
@@ -213,15 +214,18 @@ class inpainting_ui:
         pipeline = LDMSuperResolutionPipeline.from_pretrained(model_id)
         pipeline = pipeline.to(device)
 
+        # Get the current image, may be able to pull this from self.canvas
         low_res_img = Image.open(self.history[-1]).convert("RGB")
 
+        # Determine mask bounding box
         y, x = np.nonzero(self.mask)
-        if len(x) > 0:
+        if len(x) > 0 and len(y) > 0:
             low_res_img = low_res_img.crop((min(x), min(y), max(x), max(y)))
 
+        # Super Res the image
         try:
-            upscaled_image = pipeline(low_res_img, num_inference_steps=100, eta=1).images[0]
-            self.update_canvas_image(upscaled_image)
+            super_res_image = pipeline(low_res_img, num_inference_steps=100, eta=1).images[0]
+            self.update_canvas_image(super_res_image)
         except Exception as ex:
             print(ex)
             messagebox.showinfo("Error", ex.args[0]) 
