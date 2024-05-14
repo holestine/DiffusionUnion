@@ -5,7 +5,7 @@ from diffusers.utils import load_image, make_image_grid
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import threading
-from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline
+from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline, StableDiffusionPipeline, DPMSolverMultistepScheduler
 import torch
 import os, time
 import numpy as np
@@ -86,7 +86,7 @@ class inpainting_ui:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion", "Stable Diffusion XL", "Kandinsky 2.2"]
+        checkpoint_options = ["Stable Diffusion 1.5", "Stable Diffusion XL 1.5", "Kandinsky 2.2", "Stable Diffusion 2.1", "Stable Diffusion 2 Depth"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the diffusion model to use')
         Label(checkpoint_frame, text="Diffusion Model:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
@@ -141,12 +141,16 @@ class inpainting_ui:
         
     def update_controls(self):
         checkpoint = self.checkpoint.get()
-        if checkpoint == "Stable Diffusion" or checkpoint == "Stable Diffusion XL":
+        if checkpoint == "Stable Diffusion 1.5" or checkpoint == "Stable Diffusion XL 1.5":
             self.negative_prompt['state'] = DISABLED
             self.negative_prompt['bg'] = '#D3D3D3'
             self.blur_entry['state'] = NORMAL
             self.generator_entry['state'] = NORMAL
             #self.strength_entry['state'] = NORMAL
+        elif checkpoint == "Stable Diffusion 2.1":
+            print('2.1')
+        elif checkpoint == "Stable Diffusion 2 Depth":
+            print('Depth')
         elif checkpoint == "Kandinsky 2.2":
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
@@ -246,41 +250,60 @@ class inpainting_ui:
         init_image = load_image(self.history[-1])
         model_name = self.checkpoint.get()
 
-        if model_name == "Stable Diffusion":
-            pipeline = AutoPipelineForInpainting.from_pretrained(
+        if model_name == "Stable Diffusion 1.5":
+            pipe = AutoPipelineForInpainting.from_pretrained(
                 "runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16, variant="fp16"
             )
-            pipeline.enable_model_cpu_offload()
+            pipe.enable_model_cpu_offload()
             if self.use_efficient_attention:
-                pipeline.enable_xformers_memory_efficient_attention()
-            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
+                pipe.enable_xformers_memory_efficient_attention()
+            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
             generator = torch.Generator("cuda").manual_seed(int(self.generator_entry.get()))
-            #image = pipeline(
+            #image = pipe(
             #    prompt=prompt, 
             #    image=init_image, 
             #    mask_image=self.mask, 
             #    generator=generator, 
             #    strength=float(self.strength_entry.get()),
             #    guidance_scale=float(self.guidance_entry.get())).images[0]
-            image = pipeline(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
-        elif model_name == "Stable Diffusion XL":
-            pipeline = AutoPipelineForInpainting.from_pretrained(
+            image = pipe(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
+        elif model_name == "Stable Diffusion XL 1.5":
+            pipe = AutoPipelineForInpainting.from_pretrained(
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16"
             )
-            pipeline.enable_model_cpu_offload()
+            pipe.enable_model_cpu_offload()
             if self.use_efficient_attention:
-                pipeline.enable_xformers_memory_efficient_attention()
+                pipe.enable_xformers_memory_efficient_attention()
             generator = torch.Generator("cuda").manual_seed(int(self.generator_entry.get()))
-            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
-            image = pipeline(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
+            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
+            image = pipe(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
         elif model_name == "Kandinsky 2.2":
-            pipeline = AutoPipelineForInpainting.from_pretrained(
+            pipe = AutoPipelineForInpainting.from_pretrained(
                 "kandinsky-community/kandinsky-2-2-decoder-inpaint", torch_dtype=torch.float16
             )
-            pipeline.enable_model_cpu_offload()
+            pipe.enable_model_cpu_offload()
             if self.use_efficient_attention:
-                pipeline.enable_xformers_memory_efficient_attention()
-            image = pipeline(prompt=prompt, negative_prompt=negative_prompt, image=init_image, mask_image=self.mask).images[0]
+                pipe.enable_xformers_memory_efficient_attention()
+            image = pipe(prompt=prompt, negative_prompt=negative_prompt, image=init_image, mask_image=self.mask).images[0]
+        elif model_name == "Stable Diffusion 2.1":
+            # https://huggingface.co/stabilityai/stable-diffusion-2-1
+            pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+            pipe = pipe.to("cuda")
+
+            image = pipe(prompt=prompt).images[0]
+
+        elif model_name == "Stable Diffusion 2 Depth":
+            #import torch
+            from diffusers import StableDiffusionDepth2ImgPipeline
+            #from diffusers.utils import load_image, make_image_grid
+
+            pipe = StableDiffusionDepth2ImgPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-2-depth",
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+            ).to("cuda")
+            image = pipe(prompt=prompt, image=init_image, negative_prompt=negative_prompt, strength=0.7).images[0]
         else:
             print("Specify a supported model.\n")
             return

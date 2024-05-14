@@ -3,10 +3,10 @@ Adding some application logic around some diffusion models to make their capabil
 
 # Prepare the environment
 '''
-conda create --name du python=3.10
+conda create --name du python=3.10 -y
 conda activate du
 python -m pip install -U pip
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 accelerate xformers diffusers transformers matplotlib -c pytorch -c nvidia -c xformers -c conda-forge 
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 accelerate xformers diffusers transformers matplotlib -c pytorch -c nvidia -c xformers -c conda-forge -y 
 '''
 
 # Guide
