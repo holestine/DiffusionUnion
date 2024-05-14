@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import filedialog, messagebox
+from idlelib.tooltip import Hovertip
 from diffusers.utils import load_image, make_image_grid
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
@@ -8,17 +9,11 @@ from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline
 import torch
 import os, time
 import numpy as np
-from idlelib.tooltip import Hovertip
+from controls import create_number_control
 
 DEBUG = FALSE
 
 class inpainting_ui:
-
-    def filter_numbers_only(self, value):
-        if str.isdigit(value) or value == "":
-            return True
-        else:
-            return False
 
     def __init__(self, parent, width=512, height=512):
 
@@ -84,39 +79,38 @@ class inpainting_ui:
         # Create text box for entering negative prompt
         Label(parent, text="Negative Prompt:", anchor=W).pack(side=TOP, fill=X, expand=FALSE)
         self.negative_prompt = Text(parent, height=1, wrap=WORD)
-        self.negative_prompt.insert(END, "bad anatomy, deformed, ugly")
+        self.negative_prompt.insert(END, "bad anatomy, deformed, ugly, poor details, blurry")
         self.negative_prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
 
     def initialize_toolbar(self, toolbar):
         
-        # Create combo box for selecting diffusion model
+        # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
         checkpoint_options = ["Stable Diffusion", "Stable Diffusion XL", "Kandinsky 2.2"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the diffusion model to use')
         Label(checkpoint_frame, text="Diffusion Model:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
-        OptionMenu(checkpoint_frame, self.checkpoint, *checkpoint_options).pack(side=LEFT, fill=X, expand=TRUE)
+        checkpoint_menu = OptionMenu(checkpoint_frame, self.checkpoint, *checkpoint_options)
+        checkpoint_menu.config(width=20)
+        checkpoint_menu.pack(side=LEFT, fill=X, expand=TRUE)
         checkpoint_frame.pack(side=LEFT, fill=X, expand=FALSE)
         self.checkpoint.trace_add("write", self.checkpoint_selection_callback) # Need to update UI when this changes
 
-        # Create textbox for entering radius
-        radius_frame = Frame(toolbar, bg='grey')
-        self.radius = IntVar(radius_frame, 100)
-        Hovertip(radius_frame, 'Select the radius for the paintbrush used to draw the mask')
-        Label(radius_frame, text="Radius:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
-        self.radius_entry = Entry(radius_frame, validate='all', validatecommand=(toolbar.register(self.filter_numbers_only), '%P'), textvariable=self.radius)
-        self.radius_entry.pack(side=LEFT, fill=BOTH, expand=TRUE)
-        radius_frame.pack(side=LEFT, fill=BOTH, expand=FALSE)
+        # Create a control for entering the brush size
+        self.radius_entry = create_number_control(toolbar, 100, 'Mask Radius', 'Enter the radius of the brush used to draw the mask', positive=True, gt_zero=True)
 
-        # Create textbox for entering the mask blur
-        blur_frame = Frame(toolbar, bg='grey')
-        self.blur_factor = IntVar(blur_frame, 33)
-        Hovertip(blur_frame, 'Enter the blur factor for the mask')
-        Label(blur_frame, text="Blur Factor:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
-        self.blur_entry = Entry(blur_frame, validate='all', validatecommand=(toolbar.register(self.filter_numbers_only), '%P'), textvariable=self.blur_factor)
-        self.blur_entry.pack(side=LEFT, fill=BOTH, expand=TRUE)
-        blur_frame.pack(side=LEFT, fill=BOTH, expand=FALSE)
+        # Create a control for entering the mask blur
+        self.blur_entry = create_number_control(toolbar, 33, 'Blur Factor', 'Amount for the mask to blend with the original image.', positive=True)
 
+        # Create a control for entering the generator value
+        self.generator_entry = create_number_control(toolbar, 1, 'Generator', 'Different int values produce different results.')
+
+        # Create textbox for entering the strength value
+        #self.strength_entry = create_number_control(toolbar, 0.75, "Strength", 'Enter a value from 0 to 1. Higher values generally result in higher quality images but takes longer.')
+        
+        # Create textbox for entering the guidance value
+        #self.guidance_entry = create_number_control(toolbar, 7.5, "Guidance", 'Enter a numeric value. Values between 7 and 8.5 are usually good choices, the default is 7.5. Higher values should make the image more closely match the prompt.')
+        
         # Create a button to load a background
         self.load_button = Button(toolbar, text="Load Background", command=self.load_background)
         Hovertip(self.load_button, 'Open an image')
@@ -151,10 +145,14 @@ class inpainting_ui:
             self.negative_prompt['state'] = DISABLED
             self.negative_prompt['bg'] = '#D3D3D3'
             self.blur_entry['state'] = NORMAL
+            self.generator_entry['state'] = NORMAL
+            #self.strength_entry['state'] = NORMAL
         elif checkpoint == "Kandinsky 2.2":
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
             self.blur_entry['state'] = DISABLED
+            self.generator_entry['state'] = DISABLED
+            #self.strength_entry['state'] = DISABLED
 
         if len(self.history) > 1:
             self.undo_button["state"] = NORMAL
@@ -191,7 +189,7 @@ class inpainting_ui:
         # Draw a circle on the image and on the mask in the exact same location
         if self.drawing:
             x, y = event.x, event.y
-            radius = self.radius.get()
+            radius = int(self.radius_entry.get())
             left, top, right, bottom = x-radius, y-radius, x+radius, y+radius
             self.canvas.create_oval(left, top, right, bottom, fill="white", outline="")
             self.mask_editor.ellipse([(left, top), (right, bottom)], fill=(255))
@@ -255,8 +253,15 @@ class inpainting_ui:
             pipeline.enable_model_cpu_offload()
             if self.use_efficient_attention:
                 pipeline.enable_xformers_memory_efficient_attention()
-            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=self.blur_factor.get())
-            generator = torch.Generator("cuda").manual_seed(92)
+            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
+            generator = torch.Generator("cuda").manual_seed(int(self.generator_entry.get()))
+            #image = pipeline(
+            #    prompt=prompt, 
+            #    image=init_image, 
+            #    mask_image=self.mask, 
+            #    generator=generator, 
+            #    strength=float(self.strength_entry.get()),
+            #    guidance_scale=float(self.guidance_entry.get())).images[0]
             image = pipeline(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
         elif model_name == "Stable Diffusion XL":
             pipeline = AutoPipelineForInpainting.from_pretrained(
@@ -265,8 +270,8 @@ class inpainting_ui:
             pipeline.enable_model_cpu_offload()
             if self.use_efficient_attention:
                 pipeline.enable_xformers_memory_efficient_attention()
-            generator = torch.Generator("cuda").manual_seed(92)
-            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=self.blur_factor.get())
+            generator = torch.Generator("cuda").manual_seed(int(self.generator_entry.get()))
+            self.mask = pipeline.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
             image = pipeline(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
         elif model_name == "Kandinsky 2.2":
             pipeline = AutoPipelineForInpainting.from_pretrained(
