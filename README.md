@@ -40,4 +40,4 @@ Some other generated images
 | | | | | |
 |:-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:|
 |![](./assets/mountain.png)|![](./assets/creature.png)|![](./assets/river_in_storm.png)|![](./assets/river_cat_1.png)|![](./assets/river_cat_2.png)|
-
+|![](./assets/icy_mountain.png)|||||

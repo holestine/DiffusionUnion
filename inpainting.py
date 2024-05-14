@@ -5,7 +5,7 @@ from diffusers.utils import load_image, make_image_grid
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import threading
-from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline, StableDiffusionPipeline, DPMSolverMultistepScheduler
+from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline, StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusionDepth2ImgPipeline
 import torch
 import os, time
 import numpy as np
@@ -70,7 +70,7 @@ class inpainting_ui:
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a mountain town next to a ski resort surrounded by bushes and trees near a waterfall and a rocky river during a lightning storm with a clear starry sky in the background, highly detailed, 8k, realistic"
+        prompt = "a ski resort surrounded by bushes and trees near a frozen waterfall and a rocky river during a lightning storm with polar bears hiding from the weather, highly detailed, 8k, realistic"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=FALSE)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)
@@ -97,7 +97,7 @@ class inpainting_ui:
         self.checkpoint.trace_add("write", self.checkpoint_selection_callback) # Need to update UI when this changes
 
         # Create a control for entering the brush size
-        self.radius_entry = create_number_control(toolbar, 100, 'Mask Radius', 'Enter the radius of the brush used to draw the mask', positive=True, gt_zero=True)
+        self.radius_entry = create_number_control(toolbar, 100, 'Brush Radius', 'Enter the radius of the brush used to draw the mask', positive=True, gt_zero=True)
 
         # Create a control for entering the mask blur
         self.blur_entry = create_number_control(toolbar, 33, 'Blur Factor', 'Amount for the mask to blend with the original image.', positive=True)
@@ -106,7 +106,7 @@ class inpainting_ui:
         self.generator_entry = create_number_control(toolbar, 1, 'Generator', 'Different int values produce different results.')
 
         # Create textbox for entering the strength value
-        #self.strength_entry = create_number_control(toolbar, 0.75, "Strength", 'Enter a value from 0 to 1. Higher values generally result in higher quality images but takes longer.')
+        self.strength_entry = create_number_control(toolbar, 0.7, "Strength", 'Enter a value from 0 to 1. Higher values generally result in higher quality images but take longer.', increment=.05, positive=True, type=float, max=1)
         
         # Create textbox for entering the guidance value
         #self.guidance_entry = create_number_control(toolbar, 7.5, "Guidance", 'Enter a numeric value. Values between 7 and 8.5 are usually good choices, the default is 7.5. Higher values should make the image more closely match the prompt.')
@@ -144,19 +144,31 @@ class inpainting_ui:
         if checkpoint == "Stable Diffusion 1.5" or checkpoint == "Stable Diffusion XL 1.5":
             self.negative_prompt['state'] = DISABLED
             self.negative_prompt['bg'] = '#D3D3D3'
+            self.radius_entry['state'] = NORMAL
             self.blur_entry['state'] = NORMAL
             self.generator_entry['state'] = NORMAL
-            #self.strength_entry['state'] = NORMAL
+            self.strength_entry['state'] = DISABLED
         elif checkpoint == "Stable Diffusion 2.1":
-            print('2.1')
+            self.negative_prompt['state'] = DISABLED
+            self.negative_prompt['bg'] = '#D3D3D3'
+            self.radius_entry['state'] = DISABLED
+            self.blur_entry['state'] = DISABLED
+            self.generator_entry['state'] = DISABLED
+            self.strength_entry['state'] = DISABLED
         elif checkpoint == "Stable Diffusion 2 Depth":
-            print('Depth')
+            self.negative_prompt["state"] = NORMAL
+            self.negative_prompt['bg'] = '#FFFFFF'
+            self.radius_entry['state'] = DISABLED
+            self.blur_entry['state'] = DISABLED
+            self.generator_entry['state'] = DISABLED
+            self.strength_entry['state'] = NORMAL
         elif checkpoint == "Kandinsky 2.2":
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
+            self.radius_entry['state'] = NORMAL
             self.blur_entry['state'] = DISABLED
             self.generator_entry['state'] = DISABLED
-            #self.strength_entry['state'] = DISABLED
+            self.strength_entry['state'] = DISABLED
 
         if len(self.history) > 1:
             self.undo_button["state"] = NORMAL
@@ -294,16 +306,13 @@ class inpainting_ui:
             image = pipe(prompt=prompt).images[0]
 
         elif model_name == "Stable Diffusion 2 Depth":
-            #import torch
-            from diffusers import StableDiffusionDepth2ImgPipeline
-            #from diffusers.utils import load_image, make_image_grid
-
+            strength = float(self.strength_entry.get())
             pipe = StableDiffusionDepth2ImgPipeline.from_pretrained(
                 "stabilityai/stable-diffusion-2-depth",
                 torch_dtype=torch.float16,
                 use_safetensors=True,
             ).to("cuda")
-            image = pipe(prompt=prompt, image=init_image, negative_prompt=negative_prompt, strength=0.7).images[0]
+            image = pipe(prompt=prompt, image=init_image, negative_prompt=negative_prompt, strength=strength).images[0]
         else:
             print("Specify a supported model.\n")
             return
