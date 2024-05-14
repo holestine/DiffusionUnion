@@ -38,7 +38,7 @@ This tab exposes the features of the Stable Diffisuion, Stable Diffusion XL and 
 
 Some other generated images
 | | | | | |
-|:-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:|
+|:-------------------------:|:-------------------------:|:-------------------------:|
 |![](./assets/creature.png)|![](./assets/river_in_storm.png)|![](./assets/river_cat_1.png)|
 
 | | |
