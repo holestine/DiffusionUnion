@@ -10,7 +10,7 @@ from diffusers import AutoPipelineForInpainting
 import torch
 import os, time
 import numpy as np
-from tkVideoPlayer import TkinterVideo
+#from tkVideoPlayer import TkinterVideo
 
 class image_to_vid:
     
@@ -42,10 +42,10 @@ class image_to_vid:
         return toolbar, left_frame, right_frame
 
     def initialize_canvas(self, left_frame):
-        self.videoplayer = TkinterVideo(master=left_frame, scaled=True)
-        self.videoplayer.pack(expand=True, fill="both")
-        self.videoplayer.load(r"generated.mp4")
-        self.videoplayer.play() # play the video
+        #self.videoplayer = TkinterVideo(master=left_frame, scaled=True)
+        #self.videoplayer.pack(expand=True, fill="both")
+        #self.videoplayer.load(r"generated.mp4")
+        #self.videoplayer.play() # play the video
 
         return
         # Create a black image for the background
