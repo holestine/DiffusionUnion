@@ -34,7 +34,7 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
     Label(frame, text=text, anchor=W).pack(side=LEFT, fill=Y, expand=False)
 
     def decrease():
-        new_value = round((type(entry.get())-type(increment))*100)/100
+        new_value = type(round((type(entry.get())-type(increment))*100)/100)
 
         if not positive:
             x.set(new_value)
@@ -46,7 +46,7 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
                 x.set(new_value)
 
     def increase():
-        new_value = round((type(entry.get())+type(increment))*100)/100
+        new_value = type(round((type(entry.get())+type(increment))*100)/100)
         if new_value <= max:
             x.set(new_value)
 
