@@ -16,7 +16,7 @@
             "name": "Python: Launch UI",
             "type": "debugpy",
             "request": "launch",
-            "program": "ui.py",
+            "program": "main.py",
             "console": "integratedTerminal"
         },
     ]
