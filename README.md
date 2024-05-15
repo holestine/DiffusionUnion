@@ -1,7 +1,9 @@
 # DiffusionUnion
+
 Adding some application logic around some diffusion models to make their capabilities a little more accessible.
 
 # Prepare the environment
+
 '''
 conda create --name du python=3.10 -y
 conda activate du
