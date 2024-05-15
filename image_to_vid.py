@@ -10,12 +10,13 @@ from diffusers import AutoPipelineForInpainting
 import torch
 import os, time
 import numpy as np
+
 #from tkVideoPlayer import TkinterVideo
 
 class image_to_vid:
     
     def __init__(self, parent, width=512, height=512):
-        self.debug = FALSE
+        self.debug = False
         self.history = []
         self.width = width
         self.height = height
@@ -29,15 +30,15 @@ class image_to_vid:
     def create_layout(self, parent):
         # Create toolbar
         toolbar = Frame(parent, width=2*self.width, height=20, bg='grey')
-        toolbar.pack(side=TOP, fill=X, expand=FALSE)
+        toolbar.pack(side=TOP, fill=X, expand=False)
 
         # Create left frame
         left_frame = Frame(parent, width=self.width, height=self.height, bg='grey')
-        left_frame.pack(side=LEFT, fill=BOTH, expand=TRUE)
+        left_frame.pack(side=LEFT, fill=BOTH, expand=True)
 
         # Create right frame
         right_frame = Frame(parent, width=self.width, height=self.height, bg='grey')
-        right_frame.pack(side=RIGHT, fill=BOTH, expand=TRUE)
+        right_frame.pack(side=RIGHT, fill=BOTH, expand=True)
 
         return toolbar, left_frame, right_frame
 
@@ -63,42 +64,42 @@ class image_to_vid:
     def initialize_prompts(self, right_frame):
         # Create text box for entering the prompt
         self.prompt_label = Label(right_frame, text="Positive Prompt:", anchor=W)
-        self.prompt_label.pack(side=TOP, fill=X, expand=FALSE)
+        self.prompt_label.pack(side=TOP, fill=X, expand=False)
         
         self.prompt = Text(right_frame, height=3, wrap=WORD)
         self.prompt.insert(END, "a scary monster that looks like the grim reaper dancing by a river in the mountains, high resolution, highly detailed, 8k, in a style similar to Tim Burton, realistic level of detail, pixar")
-        self.prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
+        self.prompt.pack(side=TOP, fill=BOTH, expand=True)
 
         # Create text box for entering negative prompt
         self.negative_prompt_label = Label(right_frame, text="Negative Prompt:", anchor=W)
-        self.negative_prompt_label.pack(side=TOP, fill=X, expand=FALSE)
+        self.negative_prompt_label.pack(side=TOP, fill=X, expand=False)
         
         self.negative_prompt = Text(right_frame, height=3, wrap=WORD)
         self.negative_prompt.insert(END, "Distorted, discontinuous, Ugly, blurry, low resolution, motionless, static, disfigured, disconnected limbs, Ugly faces, incomplete arms")
-        self.negative_prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
+        self.negative_prompt.pack(side=TOP, fill=BOTH, expand=True)
 
     def initialize_toolbar(self, toolbar):
         
         # Create combo box for selecting diffusion model
         model_frame = Frame(toolbar, bg='grey')
-        model_frame.pack(side=LEFT, fill=X, expand=FALSE)
+        model_frame.pack(side=LEFT, fill=X, expand=False)
 
         self.model_label = Label(model_frame, text="Diffusion Model:", anchor=W)
-        self.model_label.pack(side=LEFT, fill=Y, expand=FALSE)
+        self.model_label.pack(side=LEFT, fill=Y, expand=False)
 
         self.model = StringVar(model_frame, "ModelScopeT2V")
 
         model_options = ["ModelScopeT2V"]
         model_drop = OptionMenu(model_frame, self.model, *model_options)
-        model_drop.pack(side=LEFT, fill=X, expand=TRUE)
+        model_drop.pack(side=LEFT, fill=X, expand=True)
 
         # Create button to load a background
         self.load_button = Button(toolbar, text="Load Background", command=self.load_background)
-        self.load_button.pack(side=LEFT, fill=X, expand=FALSE)
+        self.load_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create button to generate the image
         self.clear_button = Button(toolbar, text="Generate Video", command=self.generate)
-        self.clear_button.pack(side=LEFT, fill=X, expand=FALSE)
+        self.clear_button.pack(side=LEFT, fill=X, expand=False)
 
     def load_background(self):
         res = filedialog.askopenfile(initialdir="./history")
@@ -127,9 +128,9 @@ class image_to_vid:
             export_to_video(video_frames, "generated.mp4", fps=5)
 
 
-            
-            self.videoplayer.load(r"generated.mp4")
-            self.videoplayer.play() # play the video
+            # Didn't work
+            #self.videoplayer.load(r"generated.mp4")
+            #self.videoplayer.play() # play the video
 
 
         return

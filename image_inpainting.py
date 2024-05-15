@@ -11,9 +11,9 @@ import os, time
 import numpy as np
 from controls import create_number_control
 
-DEBUG = FALSE
+DEBUG = False
 
-class inpainting_ui:
+class inpainting_tab:
 
     def __init__(self, parent, width=512, height=512):
 
@@ -44,15 +44,15 @@ class inpainting_ui:
     def create_layout(self, parent):
         # Create toolbar
         toolbar = Frame(parent, width=2*self.width, height=20, bg='grey')
-        toolbar.pack(side=TOP, fill=X, expand=FALSE)
+        toolbar.pack(side=TOP, fill=X, expand=False)
 
         # Create left frame
         left_frame = Frame(parent, width=self.width, height=self.height, bg='grey')
-        left_frame.pack(side=LEFT, fill=BOTH, expand=FALSE)
+        left_frame.pack(side=LEFT, fill=BOTH, expand=False)
 
         # Create right frame
         right_frame = Frame(parent, width=self.width, height=self.height, bg='grey')
-        right_frame.pack(side=RIGHT, fill=BOTH, expand=TRUE)
+        right_frame.pack(side=RIGHT, fill=BOTH, expand=True)
 
         return toolbar, left_frame, right_frame
 
@@ -71,16 +71,16 @@ class inpainting_ui:
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
         prompt = "a ski resort surrounded by bushes and trees near a frozen waterfall and a rocky river during a lightning storm with polar bears hiding from the weather, highly detailed, 8k, realistic"
-        Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=FALSE)
+        Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)
-        self.prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
+        self.prompt.pack(side=TOP, fill=BOTH, expand=True)
 
         # Create text box for entering negative prompt
-        Label(parent, text="Negative Prompt:", anchor=W).pack(side=TOP, fill=X, expand=FALSE)
+        Label(parent, text="Negative Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.negative_prompt = Text(parent, height=1, wrap=WORD)
         self.negative_prompt.insert(END, "bad anatomy, deformed, ugly, poor details, blurry")
-        self.negative_prompt.pack(side=TOP, fill=BOTH, expand=TRUE)
+        self.negative_prompt.pack(side=TOP, fill=BOTH, expand=True)
 
     def initialize_toolbar(self, toolbar):
         
@@ -89,11 +89,11 @@ class inpainting_ui:
         checkpoint_options = ["Stable Diffusion 1.5", "Stable Diffusion XL 1.5", "Kandinsky 2.2", "Stable Diffusion 2.1", "Stable Diffusion 2 Depth"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the diffusion model to use')
-        Label(checkpoint_frame, text="Diffusion Model:", anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
+        Label(checkpoint_frame, text="Diffusion Model:", anchor=W).pack(side=LEFT, fill=Y, expand=False)
         checkpoint_menu = OptionMenu(checkpoint_frame, self.checkpoint, *checkpoint_options)
         checkpoint_menu.config(width=20)
-        checkpoint_menu.pack(side=LEFT, fill=X, expand=TRUE)
-        checkpoint_frame.pack(side=LEFT, fill=X, expand=FALSE)
+        checkpoint_menu.pack(side=LEFT, fill=X, expand=True)
+        checkpoint_frame.pack(side=LEFT, fill=X, expand=False)
         self.checkpoint.trace_add("write", self.checkpoint_selection_callback) # Need to update UI when this changes
 
         # Create a control for entering the brush size
@@ -114,27 +114,27 @@ class inpainting_ui:
         # Create a button to load a background
         self.load_button = Button(toolbar, text="Load Background", command=self.load_background)
         Hovertip(self.load_button, 'Open an image')
-        self.load_button.pack(side=LEFT, fill=X, expand=FALSE)
+        self.load_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to generate the image
         self.generate_button = Button(toolbar, text="Generate Image", command=self.generate)
         Hovertip(self.generate_button, 'Generate a new image')
-        self.generate_button.pack(side=LEFT, fill=X, expand=FALSE)
+        self.generate_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to clear the canvas
         self.clear_button = Button(toolbar, text="Clear Mask", command=self.refresh_canvas)
         Hovertip(self.clear_button, 'Clear the current mask')
-        self.clear_button.pack(side=LEFT, fill=X, expand=FALSE)
+        self.clear_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to increase the image's resolution
         self.super_res_button = Button(toolbar, text="Super Res", command=self.super_res)
         Hovertip(self.super_res_button,'Increase the image resolution')
-        self.super_res_button.pack(side=LEFT, fill=X, expand=FALSE)
+        self.super_res_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to revert changes
         self.undo_button = Button(toolbar, text="Undo", command=self.undo)
         Hovertip(self.undo_button,'Undo the last generated image')
-        self.undo_button.pack(side=LEFT, fill=X, expand=FALSE)
+        self.undo_button.pack(side=LEFT, fill=X, expand=False)
         
     def checkpoint_selection_callback(self, *args):
         self.update_controls()
@@ -199,7 +199,7 @@ class inpainting_ui:
         self.refresh_canvas()     
     
     def start_drawing(self, event):
-        self.drawing = TRUE
+        self.drawing = True
 
     def draw(self, event):
         # Draw a circle on the image and on the mask in the exact same location

@@ -31,7 +31,7 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
     Hovertip(frame, tip)
 
     # Add the label
-    Label(frame, text=text, anchor=W).pack(side=LEFT, fill=Y, expand=FALSE)
+    Label(frame, text=text, anchor=W).pack(side=LEFT, fill=Y, expand=False)
 
     def decrease():
         new_value = round((type(entry.get())-type(increment))*100)/100
@@ -51,7 +51,7 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
             x.set(new_value)
 
     # Create a button to decrease the value
-    Button(frame, text="-", command=decrease).pack(side=LEFT, fill=BOTH, expand=TRUE)
+    Button(frame, text="-", command=decrease).pack(side=LEFT, fill=BOTH, expand=True)
 
     # Create the variable and associate it with the control
     if type == int:
@@ -62,7 +62,7 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
         entry = Entry(frame, width=6, validate='all', validatecommand=(parent.register(filter_numbers_only), '%P'), textvariable=x)
         
     # Align everything to the left and fill the space
-    entry.pack(side=LEFT, fill=BOTH, expand=TRUE)
-    Button(frame, text="+", command=increase).pack(side=LEFT, fill=BOTH, expand=TRUE)
-    frame.pack(side=LEFT, fill=BOTH, expand=FALSE)
+    entry.pack(side=LEFT, fill=BOTH, expand=True)
+    Button(frame, text="+", command=increase).pack(side=LEFT, fill=BOTH, expand=True)
+    frame.pack(side=LEFT, fill=BOTH, expand=False)
     return entry

@@ -8,7 +8,8 @@ Adding some application logic around some diffusion models to make their capabil
 conda create --name du python=3.10 -y
 conda activate du
 python -m pip install -U pip
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 accelerate xformers diffusers transformers matplotlib -c pytorch -c nvidia -c xformers -c conda-forge -y 
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 accelerate xformers diffusers transformers matplotlib -c pytorch -c nvidia -c xformers -c conda-forge -y
+pip install opencv-python
 ```
 
 # Guide
@@ -41,7 +42,7 @@ This tab exposes the features of the Stable Diffisuion, Stable Diffusion XL and 
 Some other generated images
 | | | |
 |:-------------------------:|:-------------------------:|:-------------------------:|
-|![](./assets/creature.png)|![](./assets/river_in_storm.png)|![](./assets/river_cat_1.png)|
+|![](./assets/creature.png)|![](./assets/snake.png)|![](./assets/river_cat_1.png)|
 
 | | | |
 |:-------------------------:|:-------------------------:|:-------------------------:|

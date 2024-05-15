@@ -5,13 +5,14 @@ import torch
 import time
 
 import numpy as np
-import inpainting as ip
-import image_to_vid as i2v
+import image_inpainting as inpainting
+import image_generation as generation
+import image_to_vid
 
 # Disable warning, may be bug in some versions of PyTorch
 torch.backends.cudnn.enabled = False
 
-DEV_MODE = FALSE
+DEV_MODE = False
 
 class DiffusionUnionUI:
 
@@ -21,23 +22,27 @@ class DiffusionUnionUI:
         # Window title
         self.root.title("Diffusion Union")
 
-        tabControl = ttk.Notebook(root) 
-        inpainting_tab = Frame(tabControl) 
-        image_to_vid = Frame(tabControl) 
-        tabControl.add(inpainting_tab, text ='Inpainting') 
+        tabControl = ttk.Notebook(root)
+
         if DEV_MODE:
-            tabControl.add(image_to_vid, text ='Image to Video') 
+            generation_tab = Frame(tabControl)
+            generation.image_generation_ui(generation_tab)
+            tabControl.add(generation_tab, text ='Image Generation') 
+
+        inpainting_tab = Frame(tabControl)
+        inpainting.inpainting_tab(inpainting_tab)
+        tabControl.add(inpainting_tab, text ='Inpainting') 
+        
+        if DEV_MODE:
+            image_to_vid_tab = Frame(tabControl)
+            image_to_vid.image_to_vid(image_to_vid_tab)
+            tabControl.add(image_to_vid_tab, text ='Image to Video') 
             
-        tabControl.pack(expand=TRUE, fill=BOTH) 
-        
-        ip.inpainting_ui(inpainting_tab)
-        i2v.image_to_vid(image_to_vid)
-        
+        tabControl.pack(expand=True, fill=BOTH) 
 
 
 if __name__ == "__main__":
     root = Tk()
-    #app = DiffusionUnionUI(root, "background.png")
     app = DiffusionUnionUI(root)
     root.mainloop()
 
