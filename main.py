@@ -2,7 +2,7 @@ from tkinter import *
 from tkinter import ttk
 from PIL import Image
 import torch
-import time
+import os
 
 import numpy as np
 import image_inpainting as inpainting
@@ -12,7 +12,11 @@ import image_to_vid
 # Disable warning, may be bug in some versions of PyTorch
 torch.backends.cudnn.enabled = False
 
-DEV_MODE = False
+DEV_MODE = True
+
+GENERATION_TAB_NAME = 'Image Generation'
+INPAINTING_TAB_NAME = 'Inpainting'
+IMAGE2VIDEO_TAB_NAME = 'Image to Video'
 
 class DiffusionUnionUI:
 
@@ -22,23 +26,52 @@ class DiffusionUnionUI:
         # Window title
         self.root.title("Diffusion Union")
 
-        tabControl = ttk.Notebook(root)
+        # Used to store generated images
+        self.history = []
+        if not os.path.exists('history'):
+            os.makedirs('history')
 
-        if DEV_MODE:
-            generation_tab = Frame(tabControl)
-            generation.image_generation_ui(generation_tab)
-            tabControl.add(generation_tab, text ='Image Generation') 
+        self.tabControl = ttk.Notebook(root)
 
-        inpainting_tab = Frame(tabControl)
-        inpainting.inpainting_tab(inpainting_tab)
-        tabControl.add(inpainting_tab, text ='Inpainting') 
+        generation_tab = Frame(self.tabControl)
+        self.generation_tab = generation.image_generation_ui(generation_tab, self.history)
+        self.tabControl.add(generation_tab, text=GENERATION_TAB_NAME) 
+
+        inpainting_tab = Frame(self.tabControl)
+        self.inpainting_tab = inpainting.inpainting_tab(inpainting_tab, self.history)
+        self.tabControl.add(inpainting_tab, text=INPAINTING_TAB_NAME) 
         
         if DEV_MODE:
-            image_to_vid_tab = Frame(tabControl)
-            image_to_vid.image_to_vid(image_to_vid_tab)
-            tabControl.add(image_to_vid_tab, text ='Image to Video') 
+            image_to_vid_tab = Frame(self.tabControl)
+            self.image_to_vid_tab = image_to_vid.image_to_vid(image_to_vid_tab)
+            self.tabControl.add(image_to_vid_tab, text=IMAGE2VIDEO_TAB_NAME) 
             
-        tabControl.pack(expand=True, fill=BOTH) 
+        self.tabControl.pack(expand=True, fill=BOTH) 
+
+        # Used to update selected canvas with last generated image
+        root.bind("<<NotebookTabChanged>>", self.on_tab_selected)
+
+    def on_tab_selected(self, event):
+        tab = event.widget.tab('current')['text']
+        if tab == GENERATION_TAB_NAME:
+            print('{} selected'.format(tab))
+            self.generation_tab.refresh_canvas()
+         
+        elif tab == INPAINTING_TAB_NAME:
+            print('{} selected'.format(tab))
+            self.inpainting_tab.refresh_canvas()
+         
+        elif tab == IMAGE2VIDEO_TAB_NAME:
+            print('{} selected'.format(tab))
+
+
+        #tabName = event.widget.select()
+        #tab = event.widget.tab('current')['text']
+        #print('{} selected'.format(tab))
+
+        #tabName = self.tabControl.select()
+        #if tabName:
+        #    widget = self.tabControl.nametowidget(tabName) 
 
 
 if __name__ == "__main__":

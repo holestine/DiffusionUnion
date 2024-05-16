@@ -13,7 +13,7 @@ from controls import create_number_control
 
 DEBUG = False
 
-class inpainting_tab:
+class image_generation_ui:
 
     def __init__(self, parent, history, width=512, height=512):
 
@@ -24,6 +24,7 @@ class inpainting_tab:
         self.width = width
         self.height = height
 
+        # Used to store generated images
         self.history = history
 
         # Get frames needed for layout
@@ -329,4 +330,3 @@ class inpainting_tab:
         if res:
             self.history.append(res.name)
             self.refresh_canvas()
-
