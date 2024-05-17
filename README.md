@@ -46,4 +46,4 @@ Some other generated images
 
 | | | |
 |:-------------------------:|:-------------------------:|:-------------------------:|
-|![](./assets/icy_mountain.png)|![](./assets/ship.png)|![](./assets/river_cat_2.png)|
+|![](./assets/ufo.png)|![](./assets/ship.png)|![](./assets/river_cat_2.png)|
