@@ -1,3 +1,7 @@
+##################################################################################
+## I recommend not looking at this file, it is in an early stage of development ##
+##################################################################################
+
 from tkinter import *
 from tkinter import filedialog
 from diffusers.utils import load_image, make_image_grid
@@ -29,7 +33,7 @@ class image_to_vid:
 
     def create_layout(self, parent):
         # Create toolbar
-        toolbar = Frame(parent, width=2*self.width, height=20, bg='grey')
+        toolbar = Frame(parent, width=2*self.width, height=20, bg='light grey')
         toolbar.pack(side=TOP, fill=X, expand=False)
 
         # Create left frame

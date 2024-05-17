@@ -5,15 +5,15 @@ from diffusers.utils import load_image, make_image_grid
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import threading
-from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline, StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusionDepth2ImgPipeline
+from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline
 import torch
-import os, time
+import time
 import numpy as np
 from controls import create_number_control
 
 DEBUG = False
 
-class inpainting_tab:
+class inpainting_ui:
 
     def __init__(self, parent, history, width=512, height=512):
 
@@ -40,7 +40,7 @@ class inpainting_tab:
 
     def create_layout(self, parent):
         # Create toolbar
-        toolbar = Frame(parent, width=2*self.width, height=20, bg='grey')
+        toolbar = Frame(parent, width=2*self.width, height=20, bg='light grey')
         toolbar.pack(side=TOP, fill=X, expand=False)
 
         # Create left frame
@@ -62,12 +62,13 @@ class inpainting_tab:
         self.canvas.bind("<B1-Motion>",       self.draw)
         self.canvas.bind("<ButtonRelease-1>", self.stop_drawing)
 
-        # Make black background (tried noise but it didn't work as well (np.random.randint(0, 255, (self.height, self.width, 3), "uint8")))
-        self.update_canvas_image(Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8')))
+        # Create a new mask to draw on
+        self.mask = Image.new("L", (self.width, self.height))
+        self.mask_editor = ImageDraw.Draw(self.mask)
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a ski resort surrounded by bushes and trees near a frozen waterfall and a rocky river during a lightning storm with polar bears hiding from the weather, highly detailed, 8k, realistic"
+        prompt = "a large grey wolf playing outdoors, highly detailed, 8k, pixar, disney"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)
@@ -83,7 +84,7 @@ class inpainting_tab:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 1.5", "Stable Diffusion XL 1.5", "Kandinsky 2.2", "Stable Diffusion 2.1", "Stable Diffusion 2 Depth"]
+        checkpoint_options = ["Stable Diffusion 1.5", "Stable Diffusion XL 1.5", "Kandinsky 2.2"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the diffusion model to use')
         Label(checkpoint_frame, text="Model:", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -102,9 +103,6 @@ class inpainting_tab:
         # Create a control for entering the generator value
         self.generator_entry = create_number_control(toolbar, 1, 'Generator', 'Different int values produce different results.')
 
-        # Create textbox for entering the strength value
-        self.strength_entry = create_number_control(toolbar, 0.7, "Strength", 'Enter a value from 0 to 1. Higher values generally result in higher quality images but take longer.', increment=.05, positive=True, type=float, max=1)
-        
         # Create textbox for entering the guidance value
         #self.guidance_entry = create_number_control(toolbar, 7.5, "Guidance", 'Enter a numeric value. Values between 7 and 8.5 are usually good choices, the default is 7.5. Higher values should make the image more closely match the prompt.')
         
@@ -119,7 +117,7 @@ class inpainting_tab:
         self.generate_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to clear the canvas
-        self.clear_button = Button(toolbar, text="Clear Mask", command=self.refresh_canvas)
+        self.clear_button = Button(toolbar, text="Clear Mask", command=self.refresh_ui)
         Hovertip(self.clear_button, 'Clear the current mask')
         self.clear_button.pack(side=LEFT, fill=X, expand=False)
 
@@ -144,40 +142,33 @@ class inpainting_tab:
             self.radius_entry['state'] = NORMAL
             self.blur_entry['state'] = NORMAL
             self.generator_entry['state'] = NORMAL
-            self.strength_entry['state'] = DISABLED
         elif checkpoint == "Stable Diffusion 2.1":
             self.negative_prompt['state'] = DISABLED
             self.negative_prompt['bg'] = '#D3D3D3'
             self.radius_entry['state'] = DISABLED
             self.blur_entry['state'] = DISABLED
             self.generator_entry['state'] = DISABLED
-            self.strength_entry['state'] = DISABLED
-        elif checkpoint == "Stable Diffusion 2 Depth":
-            self.negative_prompt["state"] = NORMAL
-            self.negative_prompt['bg'] = '#FFFFFF'
-            self.radius_entry['state'] = DISABLED
-            self.blur_entry['state'] = DISABLED
-            self.generator_entry['state'] = DISABLED
-            self.strength_entry['state'] = NORMAL
         elif checkpoint == "Kandinsky 2.2":
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
             self.radius_entry['state'] = NORMAL
             self.blur_entry['state'] = DISABLED
             self.generator_entry['state'] = DISABLED
-            self.strength_entry['state'] = DISABLED
 
-        if len(self.history) > 1:
+        if len(self.history) >= 1:
             self.undo_button["state"] = NORMAL
         else:
             self.undo_button["state"] = DISABLED
 
-    def refresh_canvas(self):
-        self.canvas.delete("all")
-        self.canvas_bg = PhotoImage(file=self.history[-1])
-        self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
-        self.canvas.config(width=self.width, height=self.height)
-        self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
+    def refresh_ui(self):
+
+        if len(self.history) > 0:
+            self.canvas_bg = PhotoImage(file=self.history[-1])
+            self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
+            self.canvas.config(width=self.width, height=self.height)
+            self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
+        else:
+            self.canvas.delete("all")
 
         # Create a new mask to draw on
         self.mask = Image.new("L", (self.width, self.height))
@@ -188,12 +179,12 @@ class inpainting_tab:
     def update_canvas_image(self, image):
         self.history.append('history/{}.png'.format(time.time()))
         image.save(self.history[-1])
-        self.refresh_canvas()
+        self.refresh_ui()
 
     def undo(self):
         # Create new background from previous saved file
         self.history.pop()
-        self.refresh_canvas()     
+        self.refresh_ui()     
     
     def start_drawing(self, event):
         self.drawing = True
@@ -256,7 +247,12 @@ class inpainting_tab:
         # Get all necessary arguments from UI
         prompt          = self.prompt.get(         '1.0', 'end-1 chars')
         negative_prompt = self.negative_prompt.get('1.0', 'end-1 chars') 
-        init_image = load_image(self.history[-1])
+        if len(self.history) > 0:
+            init_image = load_image(self.history[-1])
+        else:
+            # I no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
+            init_image = Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8'))
+
         model_name = self.checkpoint.get()
 
         if model_name == "Stable Diffusion 1.5":
@@ -294,22 +290,6 @@ class inpainting_tab:
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
             image = pipe(prompt=prompt, negative_prompt=negative_prompt, image=init_image, mask_image=self.mask).images[0]
-        elif model_name == "Stable Diffusion 2.1":
-            # https://huggingface.co/stabilityai/stable-diffusion-2-1
-            pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-            pipe = pipe.to("cuda")
-
-            image = pipe(prompt=prompt).images[0]
-
-        elif model_name == "Stable Diffusion 2 Depth":
-            strength = float(self.strength_entry.get())
-            pipe = StableDiffusionDepth2ImgPipeline.from_pretrained(
-                "stabilityai/stable-diffusion-2-depth",
-                torch_dtype=torch.float16,
-                use_safetensors=True,
-            ).to("cuda")
-            image = pipe(prompt=prompt, image=init_image, negative_prompt=negative_prompt, strength=strength).images[0]
         else:
             print("Specify a supported model.\n")
             return
@@ -328,5 +308,5 @@ class inpainting_tab:
         res = filedialog.askopenfile(initialdir="./history")
         if res:
             self.history.append(res.name)
-            self.refresh_canvas()
+            self.refresh_ui()
 

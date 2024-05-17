@@ -2,13 +2,16 @@ from tkinter import *
 from tkinter import filedialog
 from idlelib.tooltip import Hovertip
 import threading
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+from diffusers import StableDiffusionDepth2ImgPipeline
+from diffusers.utils import load_image
+import numpy as np
 import torch
 import time
+from controls import create_number_control
 
 DEBUG = False
 
-class image_generation_ui:
+class image_depth_ui:
 
     def __init__(self, parent, history, width=512, height=512):
 
@@ -57,17 +60,23 @@ class image_generation_ui:
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a ski resort surrounded by bushes and trees near a frozen waterfall and a rocky river during a lightning storm, highly detailed, 8k, realistic"
+        prompt = "a large grey wolf playing outdoors in the arctic near a lake or river, highly detailed, 8k, realistic"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)
         self.prompt.pack(side=TOP, fill=BOTH, expand=True)
 
+        # Create text box for entering negative prompt
+        Label(parent, text="Negative Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
+        self.negative_prompt = Text(parent, height=1, wrap=WORD)
+        self.negative_prompt.insert(END, "bad anatomy, deformed, ugly, poor details, blurry")
+        self.negative_prompt.pack(side=TOP, fill=BOTH, expand=True)
+
     def initialize_toolbar(self, toolbar):
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 2.1"]
+        checkpoint_options = ["Stable Diffusion 2 Depth"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the model to use')
         Label(checkpoint_frame, text="Model:", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -76,10 +85,9 @@ class image_generation_ui:
         checkpoint_menu.pack(side=LEFT, fill=X, expand=True)
         checkpoint_frame.pack(side=LEFT, fill=X, expand=False)
 
-        # Create a button to load an image
-        self.load_button = Button(toolbar, text="Load Image", command=self.load_background)
-        Hovertip(self.load_button, 'Open an image')
-        self.load_button.pack(side=LEFT, fill=X, expand=False)
+        # Create textbox for entering the strength value
+        self.strength_entry = create_number_control(toolbar, 0.7, "Strength", 'Enter a value from 0 to 1. Higher values generally result in higher quality images but take longer.', increment=.05, positive=True, type=float, max=1)
+        
 
         # Create a button to generate the image
         self.generate_button = Button(toolbar, text="Generate Image", command=self.generate)
@@ -126,14 +134,25 @@ class image_generation_ui:
 
     def generate_thread(self):
         # Get all necessary arguments from UI
-        prompt     = self.prompt.get('1.0', 'end-1 chars')
+        prompt          = self.prompt.get(         '1.0', 'end-1 chars')
+        negative_prompt = self.negative_prompt.get('1.0', 'end-1 chars') 
         model_name = self.checkpoint.get()
+        if len(self.history) > 0:
+            init_image = load_image(self.history[-1])
+        else:
+            # I no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
+            init_image = Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8'))
 
-        if model_name == "Stable Diffusion 2.1":
-            # https://huggingface.co/stabilityai/stable-diffusion-2-1
-            pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16).to(self.device)
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-            image = pipe(prompt=prompt).images[0]
+
+        if model_name == "Stable Diffusion 2 Depth":
+            strength = float(self.strength_entry.get())
+            pipe = StableDiffusionDepth2ImgPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-2-depth",
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+            ).to("cuda")
+            image = pipe(prompt=prompt, image=init_image, negative_prompt=negative_prompt, strength=strength).images[0]
+        
         else:
             print("Specify a supported model.\n")
             return

@@ -1,21 +1,21 @@
 from tkinter import *                   
 from tkinter import ttk
-from PIL import Image
 import torch
 import os
 
-import numpy as np
 import image_inpainting as inpainting
 import image_generation as generation
+import image_depth      as depth
 import image_to_vid
 
 # Disable warning, may be bug in some versions of PyTorch
 torch.backends.cudnn.enabled = False
 
-DEV_MODE = True
+DEV_MODE = False
 
-GENERATION_TAB_NAME = 'Image Generation'
-INPAINTING_TAB_NAME = 'Inpainting'
+GENERATION_TAB_NAME  = 'Image Generation'
+INPAINTING_TAB_NAME  = 'Inpainting'
+DEPTH_TAB_NAME       = 'Depth'
 IMAGE2VIDEO_TAB_NAME = 'Image to Video'
 
 class DiffusionUnionUI:
@@ -31,6 +31,7 @@ class DiffusionUnionUI:
         if not os.path.exists('history'):
             os.makedirs('history')
 
+        # Create a tabbed interface
         self.tabControl = ttk.Notebook(root)
 
         generation_tab = Frame(self.tabControl)
@@ -38,8 +39,12 @@ class DiffusionUnionUI:
         self.tabControl.add(generation_tab, text=GENERATION_TAB_NAME) 
 
         inpainting_tab = Frame(self.tabControl)
-        self.inpainting_tab = inpainting.inpainting_tab(inpainting_tab, self.history)
+        self.inpainting_tab = inpainting.inpainting_ui(inpainting_tab, self.history)
         self.tabControl.add(inpainting_tab, text=INPAINTING_TAB_NAME) 
+
+        depth_tab = Frame(self.tabControl)
+        self.depth_tab = depth.image_depth_ui(depth_tab, self.history)
+        self.tabControl.add(depth_tab, text=DEPTH_TAB_NAME)
         
         if DEV_MODE:
             image_to_vid_tab = Frame(self.tabControl)
@@ -48,33 +53,28 @@ class DiffusionUnionUI:
             
         self.tabControl.pack(expand=True, fill=BOTH) 
 
-        # Used to update selected canvas with last generated image
+        # Used perform any synchronizing activities when a new tab is selected
         root.bind("<<NotebookTabChanged>>", self.on_tab_selected)
 
     def on_tab_selected(self, event):
-        tab = event.widget.tab('current')['text']
-        if tab == GENERATION_TAB_NAME:
-            print('{} selected'.format(tab))
-            self.generation_tab.refresh_canvas()
+        tab_name = event.widget.tab('current')['text']
+        if tab_name == GENERATION_TAB_NAME:
+            #print('{} selected'.format(tab_name))
+            self.generation_tab.refresh_ui()
          
-        elif tab == INPAINTING_TAB_NAME:
-            print('{} selected'.format(tab))
-            self.inpainting_tab.refresh_canvas()
+        elif tab_name == INPAINTING_TAB_NAME:
+            #print('{} selected'.format(tab_name))
+            self.inpainting_tab.refresh_ui()
+        
+        elif tab_name == DEPTH_TAB_NAME:
+            #print('{} selected'.format(tab_name))
+            self.depth_tab.refresh_ui()
          
-        elif tab == IMAGE2VIDEO_TAB_NAME:
-            print('{} selected'.format(tab))
-
-
-        #tabName = event.widget.select()
-        #tab = event.widget.tab('current')['text']
-        #print('{} selected'.format(tab))
-
-        #tabName = self.tabControl.select()
-        #if tabName:
-        #    widget = self.tabControl.nametowidget(tabName) 
-
+        elif tab_name == IMAGE2VIDEO_TAB_NAME:
+            print('{} selected'.format(tab_name))
 
 if __name__ == "__main__":
+    # Create Tk UI
     root = Tk()
     app = DiffusionUnionUI(root)
     root.mainloop()
