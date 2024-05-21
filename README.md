@@ -59,7 +59,7 @@ This uses the Stable Diffusion 2 depth feature. It takes an image that gets used
 
 
 ## Super Resolution
-The super resolution feature is on Inpainting tab and can be used to obtain sharp images.
+The super resolution feature is on the Inpainting tab and can be used to produce sharp, larger images.
 
 ![](./assets/9.png)
 *Use the mask to select an area of interest.*
@@ -82,6 +82,10 @@ The super resolution feature is on Inpainting tab and can be used to obtain shar
 | | | |
 |:-------------------------:|:-------------------------:|:-------------------------:|
 |![](./assets/ufo.png)|![](./assets/ship.png)|![](./assets/river_cat_2.png)|
+
+| | | |
+|:-------------------------:|:-------------------------:|:-------------------------:|
+|![](./assets/monkey_space_bug.png)|![](./assets/ship2.png)|![](./assets/river_cat_2.png)|
 
 # TODO
 I'm adding to this repo in my spare time so stay tuned for new features and feel free to reach out if you have questions or suggestions.
