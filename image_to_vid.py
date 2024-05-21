@@ -88,7 +88,7 @@ class image_to_vid:
         model_frame = Frame(toolbar, bg='grey')
         model_frame.pack(side=LEFT, fill=X, expand=False)
 
-        self.model_label = Label(model_frame, text="Model:", anchor=W)
+        self.model_label = Label(model_frame, text="Model", anchor=W)
         self.model_label.pack(side=LEFT, fill=Y, expand=False)
 
         self.model = StringVar(model_frame, "ModelScopeT2V")

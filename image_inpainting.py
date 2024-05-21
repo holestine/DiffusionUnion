@@ -87,7 +87,7 @@ class inpainting_ui:
         checkpoint_options = ["Stable Diffusion 1.5", "Stable Diffusion XL 1.5", "Kandinsky 2.2"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the diffusion model to use')
-        Label(checkpoint_frame, text="Model:", anchor=W).pack(side=LEFT, fill=Y, expand=False)
+        Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
         checkpoint_menu = OptionMenu(checkpoint_frame, self.checkpoint, *checkpoint_options)
         checkpoint_menu.config(width=20)
         checkpoint_menu.pack(side=LEFT, fill=X, expand=True)

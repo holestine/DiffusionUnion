@@ -79,7 +79,7 @@ class image_depth_ui:
         checkpoint_options = ["Stable Diffusion 2 Depth"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the model to use')
-        Label(checkpoint_frame, text="Model:", anchor=W).pack(side=LEFT, fill=Y, expand=False)
+        Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
         checkpoint_menu = OptionMenu(checkpoint_frame, self.checkpoint, *checkpoint_options)
         checkpoint_menu.config(width=20)
         checkpoint_menu.pack(side=LEFT, fill=X, expand=True)
