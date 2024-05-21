@@ -85,7 +85,7 @@ The super resolution feature is on the Inpainting tab and can be used to produce
 
 | | | |
 |:-------------------------:|:-------------------------:|:-------------------------:|
-|![](./assets/monkey_space_bug.png)|![](./assets/ship2.png)|![](./assets/river_cat_2.png)|
+|![](./assets/monkey_space_bug.png)|![](./assets/ship2.png)|![](./assets/northern_lights.png)|
 
 # TODO
 I'm adding to this repo in my spare time so stay tuned for new features and feel free to reach out if you have questions or suggestions.
