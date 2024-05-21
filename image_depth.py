@@ -60,7 +60,7 @@ class image_depth_ui:
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a large grey wolf playing outdoors in the arctic near a lake or river, highly detailed, 8k, realistic"
+        prompt = "an alien space ship with a metallic and mechanical appearance hovering above the ground in a highly forested area in the arctic near a frozen waterfall with rocky cliffs, highly detailed, 8k, realistic, stars in the sky"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)

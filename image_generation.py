@@ -57,7 +57,7 @@ class image_generation_ui:
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a ski resort surrounded by bushes and trees near a frozen waterfall and a rocky river during a lightning storm, highly detailed, 8k, realistic"
+        prompt = "a photograph of a highly forested area in the arctic near a frozen waterfall with rocky cliffs, highly detailed, 8k, realistic"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)

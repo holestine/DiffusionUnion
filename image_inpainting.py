@@ -68,7 +68,7 @@ class inpainting_ui:
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a large grey wolf playing outdoors, highly detailed, 8k, pixar, disney"
+        prompt = "a photograph of an alien space ship with a metallic and mechanical appearance hovering above the ground in a highly forested area in the arctic near a frozen waterfall and rocky cliffs, highly detailed, 8k, realistic, stars in the sky, colorful"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)
@@ -105,11 +105,6 @@ class inpainting_ui:
 
         # Create textbox for entering the guidance value
         #self.guidance_entry = create_number_control(toolbar, 7.5, "Guidance", 'Enter a numeric value. Values between 7 and 8.5 are usually good choices, the default is 7.5. Higher values should make the image more closely match the prompt.')
-        
-        # Create a button to load a background
-        self.load_button = Button(toolbar, text="Load Background", command=self.load_background)
-        Hovertip(self.load_button, 'Open an image')
-        self.load_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to generate the image
         self.generate_button = Button(toolbar, text="Generate Image", command=self.generate)
@@ -303,10 +298,3 @@ class inpainting_ui:
             plt.show()
 
         self.update_canvas_image(image)
-        
-    def load_background(self):
-        res = filedialog.askopenfile(initialdir="./history")
-        if res:
-            self.history.append(res.name)
-            self.refresh_ui()
-
