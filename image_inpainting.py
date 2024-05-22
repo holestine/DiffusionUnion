@@ -40,7 +40,6 @@ class inpainting_ui:
         self.drawing = False
         self.current_mask = []
 
-
     def create_layout(self, parent):
         # Create toolbar
         toolbar = Frame(parent, width=2*self.width, height=20, bg='light grey')

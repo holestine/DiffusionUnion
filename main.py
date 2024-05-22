@@ -3,8 +3,9 @@ from tkinter import ttk
 import torch
 import os
 
-import image_inpainting as inpainting
 import image_generation as generation
+import image_segmentation as segmentation
+import image_inpainting as inpainting
 import image_depth      as depth
 import image_to_vid
 
@@ -13,10 +14,11 @@ torch.backends.cudnn.enabled = False
 
 DEV_MODE = False
 
-GENERATION_TAB_NAME  = 'Image Generation'
-INPAINTING_TAB_NAME  = 'Inpainting'
-DEPTH_TAB_NAME       = 'Depth'
-IMAGE2VIDEO_TAB_NAME = 'Image to Video'
+GENERATION_TAB_NAME   = 'Generation'
+SEGMENTATION_TAB_NAME = 'Segmentation'
+INPAINTING_TAB_NAME   = 'Inpainting'
+DEPTH_TAB_NAME        = 'Depth'
+IMAGE2VIDEO_TAB_NAME  = 'Image to Video'
 
 class DiffusionUnionUI:
 
@@ -37,6 +39,10 @@ class DiffusionUnionUI:
         generation_tab = Frame(self.tabControl)
         self.generation_tab = generation.image_generation_ui(generation_tab, self.history)
         self.tabControl.add(generation_tab, text=GENERATION_TAB_NAME) 
+
+        segmentation_tab = Frame(self.tabControl)
+        self.segmentation_tab = segmentation.image_segmentation_ui(segmentation_tab, self.history)
+        self.tabControl.add(segmentation_tab, text=SEGMENTATION_TAB_NAME) 
 
         inpainting_tab = Frame(self.tabControl)
         self.inpainting_tab = inpainting.inpainting_ui(inpainting_tab, self.history)
@@ -61,6 +67,10 @@ class DiffusionUnionUI:
         if tab_name == GENERATION_TAB_NAME:
             #print('{} selected'.format(tab_name))
             self.generation_tab.refresh_ui()
+
+        elif tab_name == SEGMENTATION_TAB_NAME:
+            #print('{} selected'.format(tab_name))
+            self.segmentation_tab.refresh_ui()
          
         elif tab_name == INPAINTING_TAB_NAME:
             #print('{} selected'.format(tab_name))
