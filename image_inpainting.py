@@ -24,6 +24,7 @@ class inpainting_ui:
         self.width = width
         self.height = height
 
+        # Images created this session
         self.history = history
 
         # Get frames needed for layout
@@ -37,6 +38,8 @@ class inpainting_ui:
 
         # State variables
         self.drawing = False
+        self.current_mask = []
+
 
     def create_layout(self, parent):
         # Create toolbar
@@ -112,7 +115,7 @@ class inpainting_ui:
         self.generate_button.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to clear the canvas
-        self.clear_button = Button(toolbar, text="Clear Mask", command=self.refresh_ui)
+        self.clear_button = Button(toolbar, text="Clear Mask", command=self.clear_mask)
         Hovertip(self.clear_button, 'Clear the current mask')
         self.clear_button.pack(side=LEFT, fill=X, expand=False)
 
@@ -155,6 +158,14 @@ class inpainting_ui:
         else:
             self.undo_button["state"] = DISABLED
 
+    def clear_mask(self):
+        self.current_mask = []
+
+        # Create a new mask to draw on
+        self.mask = Image.new("L", (self.width, self.height))
+        self.mask_editor = ImageDraw.Draw(self.mask)
+        self.refresh_ui()
+
     def refresh_ui(self):
 
         if len(self.history) > 0:
@@ -165,9 +176,8 @@ class inpainting_ui:
         else:
             self.canvas.delete("all")
 
-        # Create a new mask to draw on
-        self.mask = Image.new("L", (self.width, self.height))
-        self.mask_editor = ImageDraw.Draw(self.mask)
+        for (left, top, right, bottom) in self.current_mask:
+            self.canvas.create_oval(left, top, right, bottom, fill="white", outline="")
 
         self.update_controls()
 
@@ -191,7 +201,10 @@ class inpainting_ui:
             radius = int(self.radius_entry.get())
             left, top, right, bottom = x-radius, y-radius, x+radius, y+radius
             self.canvas.create_oval(left, top, right, bottom, fill="white", outline="")
+            # This draws the same oval on self.mask
             self.mask_editor.ellipse([(left, top), (right, bottom)], fill=(255))
+            # No easy way to apply masks with tkinter so keep track of how it's created
+            self.current_mask.append((left, top, right, bottom))
             return
 
     def stop_drawing(self, event):
@@ -297,4 +310,5 @@ class inpainting_ui:
             plt.imshow(make_image_grid([init_image, self.mask, image], rows=1, cols=3))
             plt.show()
 
+        self.clear_mask()
         self.update_canvas_image(image)
