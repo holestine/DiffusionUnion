@@ -2,7 +2,6 @@ from tkinter import *
 from tkinter import filedialog
 from idlelib.tooltip import Hovertip
 import threading
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 from transformers import SamModel, SamProcessor
 from transformers import pipeline
 import torch
@@ -11,30 +10,35 @@ from diffusers.utils import load_image, make_image_grid
 import numpy as np
 from PIL import Image
 
-DEBUG = True
-
-import matplotlib.pyplot as plt
-import gc
-
-
-def get_mask(mask):
-    color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-
-    h, w = mask.shape[-2:]
-    mask_image = (255*mask).reshape(h, w, 1) * color.reshape(1, 1, -1)
-
-    mask_image = Image.fromarray(mask_image.astype('uint8'), mode='RGBA')
-
-    return mask_image
+DEBUG = False
 
 
 def show_masks_on_image(raw_image_path, masks):
+
+    # Internal method to convert the mask to a transparent image
+    def get_mask_image(mask):
+        # Get a random color and add some transparency 
+        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+
+        # Height and width are the last two dimensions
+        h, w = mask.shape[-2:]
+
+        # Apply the color to the mask
+        mask_image = (255*mask).reshape(h, w, 1) * color.reshape(1, 1, -1)
+
+        # Construct the PIL image 
+        mask_image = Image.fromarray(mask_image.astype('uint8'), mode='RGBA')
+
+        return mask_image
+
+    # Load the current image
     raw_image = Image.open(raw_image_path).convert("RGBA")
-    #raw_image.show()
+
+    # Draw semi-transparent masks in different colors
     for mask in masks:
-        m = get_mask(mask)
+        m = get_mask_image(mask)
         raw_image.paste(m, (0,0), m)
-    #raw_image.show()
+
     return raw_image
 
 
@@ -87,8 +91,8 @@ class image_segmentation_ui:
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a photograph of a highly forested area in the arctic near a frozen waterfall with rocky cliffs, highly detailed, 8k, realistic"
-        Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
+        prompt = ""
+        Label(parent, text="Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)
         self.prompt.pack(side=TOP, fill=BOTH, expand=True)
@@ -97,7 +101,7 @@ class image_segmentation_ui:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 2.1"]
+        checkpoint_options = ["Segment Anything"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the model to use')
         Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -106,20 +110,10 @@ class image_segmentation_ui:
         checkpoint_menu.pack(side=LEFT, fill=X, expand=True)
         checkpoint_frame.pack(side=LEFT, fill=X, expand=False)
 
-        # Create a button to load an image
-        self.load_button = Button(toolbar, text="Load Image", command=self.load_background)
-        Hovertip(self.load_button, 'Open an image')
-        self.load_button.pack(side=LEFT, fill=X, expand=False)
-
-        # Create a button to generate the image
-        self.segment_button = Button(toolbar, text="Segment", command=self.generate)
+        # Create a button to segment the image
+        self.segment_button = Button(toolbar, text="Segment", command=self.segment)
         Hovertip(self.segment_button, 'Segment the image')
         self.segment_button.pack(side=LEFT, fill=X, expand=False)
-
-        # Create a button to revert changes
-        self.undo_button = Button(toolbar, text="Undo", command=self.undo)
-        Hovertip(self.undo_button,'Undo the last generated image')
-        self.undo_button.pack(side=LEFT, fill=X, expand=False)
 
     def refresh_ui(self):
         if len(self.history) > 0:
@@ -133,92 +127,41 @@ class image_segmentation_ui:
         self.update_controls()
 
     def update_controls(self):
-        if len(self.history) >= 1:
-            self.undo_button["state"] = NORMAL
-        else:
-            self.undo_button["state"] = DISABLED
+        self.prompt["state"] = DISABLED
+        self.prompt['bg']    = '#D3D3D3'
 
     def update_canvas_image(self, image):
         self.history.append('history/{}.png'.format(time.time()))
         image.save(self.history[-1])
         self.refresh_ui()
 
-    def undo(self):
-        # Create new background from previous saved file
-        self.history.pop()
-        self.refresh_ui()
-
-    def generate(self):
+    def segment(self):
         if DEBUG:
-            self.generate_thread()
+            self.segment_thread()
         else:
-            threading.Thread(target=self.generate_thread).start()
+            threading.Thread(target=self.segment_thread).start()
 
-    def generate_thread(self):
+    def segment_thread(self):
+        # Get all necessary arguments from UI
+        prompt     = self.prompt.get('1.0', 'end-1 chars')
+        model_name = self.checkpoint.get()
+
         if len(self.history) > 0:
             init_image = load_image(self.history[-1])
         else:
-            # I no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
+            # If no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
             init_image = Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8'))
 
         generator = pipeline("mask-generation", model="facebook/sam-vit-huge", device=0)
         outputs = generator(init_image, points_per_batch=64)
 
         masks = outputs["masks"]
-        pic = show_masks_on_image(self.history[-1], masks)
-
-        self.update_canvas_image(pic)
-
-
-    def old_generate_thread(self):
-        # Get all necessary arguments from UI
-        prompt     = self.prompt.get('1.0', 'end-1 chars')
-        model_name = self.checkpoint.get()
-        if len(self.history) > 0:
-            init_image = load_image(self.history[-1])
-        else:
-            # I no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
-            init_image = Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8'))
-
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = SamModel.from_pretrained("facebook/sam-vit-huge").to(device)
-        processor = SamProcessor.from_pretrained("facebook/sam-vit-huge")
-
-        #img_url = "https://huggingface.co/ybelkada/segment-anything/resolve/main/assets/car.png"
-        #raw_image = Image.open(requests.get(img_url, stream=True).raw).convert("RGB")
-        input_points = [[[450, 600]]]  # 2D location of a window in the image
-
-        inputs = processor(init_image, input_points=input_points, return_tensors="pt").to(device)
-        with torch.no_grad():
-            outputs = model(**inputs)
-
-        #masks = outputs["masks"]
-        #show_masks_on_image(init_image, masks)
-
-        masks = processor.image_processor.post_process_masks(
-            outputs.pred_masks.cpu(), inputs["original_sizes"].cpu(), inputs["reshaped_input_sizes"].cpu()
-        )
-        scores = outputs.iou_scores
-
+        image = show_masks_on_image(self.history[-1], masks)
+        self.update_canvas_image(image)
 
         # Use to validate inputs and outputs
         if DEBUG:
             print(prompt)
             print(model_name)
-
-        pic = torch.permute(outputs.pred_masks[0][0], (1,2,0)).detach().cpu().numpy()
-        pic -= pic.min()
-        pic /= pic.max()
-        pic *= 255
-        pic = Image.fromarray(pic.astype('uint8'))
-        self.update_canvas_image(pic)
-        
-    def load_background(self):
-        res = filedialog.askopenfile(initialdir="./history")
-        if res:
-            self.history.append(res.name)
-            self.refresh_ui()
-            self.update_controls()
-
 
 
