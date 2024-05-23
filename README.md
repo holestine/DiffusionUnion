@@ -72,6 +72,17 @@ The super resolution feature is on the Inpainting tab and can be used to produce
 ![](./assets/11.png)
 *And this is the full size 1024x1024 image from the history folder*
 
+## Segmentation
+Segmentation is on its own tab and not integrated with the rest of the app due to limitations with the tkinter canvas. The idea is to segment out masks and let the user select which one(s) to use instead of requiring them to be drawn by hand. I may try to build a more featured UI in the future using QT or JavaScript but for now you can use the Segment Anything model as shown below. It was a little tricky getting the visualization code working with the transparencies so wanted to store that here too. Anyway here's how it works.
+
+![](./assets/12.png)
+*Either load or generate an image in the Generation tab and refine it as needed using the Inpainting, Depth and Super Res features.*
+
+![](./assets/13.png)
+*Go to the Segmentation tab and push the Segment button to generate this.*
+
+![](./assets/14.png)
+*And this is the full size segmented image.*
 
 ## Some other generated images
 
