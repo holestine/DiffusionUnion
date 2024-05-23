@@ -5,6 +5,7 @@ import threading
 from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 import torch
 import time
+from controls import create_toolbar_button
 
 DEBUG = False
 
@@ -77,19 +78,13 @@ class image_generation_ui:
         checkpoint_frame.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to load an image
-        self.load_button = Button(toolbar, text="Load Image", command=self.load_background)
-        Hovertip(self.load_button, 'Open an image')
-        self.load_button.pack(side=LEFT, fill=X, expand=False)
+        self.load_button = create_toolbar_button(toolbar, 'Load Image', self.load_background, 'Open an image')
 
         # Create a button to generate the image
-        self.generate_button = Button(toolbar, text="Generate Image", command=self.generate)
-        Hovertip(self.generate_button, 'Generate a new image')
-        self.generate_button.pack(side=LEFT, fill=X, expand=False)
+        self.generate_button = create_toolbar_button(toolbar, 'Generate Image', self.generate, 'Generate a new image')
 
         # Create a button to revert changes
-        self.undo_button = Button(toolbar, text="Undo", command=self.undo)
-        Hovertip(self.undo_button,'Undo the last generated image')
-        self.undo_button.pack(side=LEFT, fill=X, expand=False)
+        self.undo_button = create_toolbar_button(toolbar, 'Undo', self.undo, 'Undo the last generated image')
 
     def refresh_ui(self):
         if len(self.history) > 0:

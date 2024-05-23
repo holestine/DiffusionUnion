@@ -1,5 +1,7 @@
 ##################################################################################
+##################################################################################
 ## I recommend not looking at this file, it is in an early stage of development ##
+##################################################################################
 ##################################################################################
 
 from tkinter import *
@@ -14,6 +16,7 @@ from diffusers import AutoPipelineForInpainting
 import torch
 import os, time
 import numpy as np
+from controls import create_toolbar_button
 
 #from tkVideoPlayer import TkinterVideo
 
@@ -98,12 +101,10 @@ class image_to_vid:
         model_drop.pack(side=LEFT, fill=X, expand=True)
 
         # Create button to load a background
-        self.load_button = Button(toolbar, text="Load Background", command=self.load_background)
-        self.load_button.pack(side=LEFT, fill=X, expand=False)
+        self.load_button = create_toolbar_button(toolbar, "Load Background", self.load_background, 'Open an image')
 
         # Create button to generate the image
-        self.clear_button = Button(toolbar, text="Generate Video", command=self.generate)
-        self.clear_button.pack(side=LEFT, fill=X, expand=False)
+        self.generate_button = create_toolbar_button(toolbar, "Generate Video", self.generate, 'Generate a video')
 
     def load_background(self):
         res = filedialog.askopenfile(initialdir="./history")

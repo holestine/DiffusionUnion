@@ -9,6 +9,7 @@ import time
 from diffusers.utils import load_image, make_image_grid
 import numpy as np
 from PIL import Image
+from controls import create_toolbar_button
 
 DEBUG = False
 
@@ -111,9 +112,7 @@ class image_segmentation_ui:
         checkpoint_frame.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to segment the image
-        self.segment_button = Button(toolbar, text="Segment", command=self.segment)
-        Hovertip(self.segment_button, 'Segment the image')
-        self.segment_button.pack(side=LEFT, fill=X, expand=False)
+        self.segment_button = create_toolbar_button(toolbar, 'Segment', self.segment, 'Segment the image')
 
     def refresh_ui(self):
         if len(self.history) > 0:

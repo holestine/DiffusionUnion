@@ -9,7 +9,7 @@ from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline
 import torch
 import time
 import numpy as np
-from controls import create_number_control
+from controls import create_number_control, create_toolbar_button
 
 DEBUG = False
 
@@ -97,36 +97,31 @@ class inpainting_ui:
         self.checkpoint.trace_add("write", self.checkpoint_selection_callback) # Need to update UI when this changes
 
         # Create a control for entering the brush size
-        self.radius_entry = create_number_control(toolbar, 100, 'Brush Radius', 'Enter the radius of the brush used to draw the mask', positive=True, gt_zero=True)
+        self.radius_entry = create_number_control(toolbar, 100, 'Brush Radius', 'Enter the radius of the brush used to draw the mask', min=1)
 
         # Create a control for entering the mask blur
-        self.blur_entry = create_number_control(toolbar, 33, 'Blur Factor', 'Amount for the mask to blend with the original image.', positive=True)
+        self.blur_entry = create_number_control(toolbar, 33, 'Blur Factor', 'Amount for the mask to blend with the original image.', min=0)
 
         # Create a control for entering the generator value
-        self.generator_entry = create_number_control(toolbar, 1, 'Generator', 'Different int values produce different results.')
+        self.generator_entry = create_number_control(toolbar, 1, 'Generator', 'Different int values produce different results.', min=1)
+
+        # Create a control for entering the generator value
+        self.inference_steps_entry = create_number_control(toolbar, 200, 'Inference Steps', 'Higher values produce better images but take longer.', min=1, max=999)
 
         # Create textbox for entering the guidance value
         #self.guidance_entry = create_number_control(toolbar, 7.5, "Guidance", 'Enter a numeric value. Values between 7 and 8.5 are usually good choices, the default is 7.5. Higher values should make the image more closely match the prompt.')
 
         # Create a button to generate the image
-        self.generate_button = Button(toolbar, text="Generate Image", command=self.generate)
-        Hovertip(self.generate_button, 'Generate a new image')
-        self.generate_button.pack(side=LEFT, fill=X, expand=False)
+        self.generate_button = create_toolbar_button(toolbar, "Generate", self.generate, 'Generate a new image')
 
         # Create a button to clear the canvas
-        self.clear_button = Button(toolbar, text="Clear Mask", command=self.clear_mask)
-        Hovertip(self.clear_button, 'Clear the current mask')
-        self.clear_button.pack(side=LEFT, fill=X, expand=False)
+        self.clear_button = create_toolbar_button(toolbar, "Clear Mask", self.clear_mask, 'Clear the current mask')
 
         # Create a button to increase the image's resolution
-        self.super_res_button = Button(toolbar, text="Super Res", command=self.super_res)
-        Hovertip(self.super_res_button,'Increase the image resolution')
-        self.super_res_button.pack(side=LEFT, fill=X, expand=False)
+        self.super_res_button = create_toolbar_button(toolbar, "Super Res", self.super_res, 'Increase the image resolution')
 
         # Create a button to revert changes
-        self.undo_button = Button(toolbar, text="Undo", command=self.undo)
-        Hovertip(self.undo_button,'Undo the last generated image')
-        self.undo_button.pack(side=LEFT, fill=X, expand=False)
+        self.undo_button = create_toolbar_button(toolbar, "Undo", self.undo, 'Undo the last generated image')
         
     def checkpoint_selection_callback(self, *args):
         self.update_controls()
@@ -252,15 +247,18 @@ class inpainting_ui:
 
     def generate_thread(self):
         # Get all necessary arguments from UI
-        prompt          = self.prompt.get(         '1.0', 'end-1 chars')
-        negative_prompt = self.negative_prompt.get('1.0', 'end-1 chars') 
+        prompt              = self.prompt.get(         '1.0', 'end-1 chars')
+        negative_prompt     = self.negative_prompt.get('1.0', 'end-1 chars')
+        generator           = int(self.generator_entry.get())
+        blur_factor         = int(self.blur_entry.get())
+        num_inference_steps = int(self.inference_steps_entry.get())
+        model_name = self.checkpoint.get()
+
         if len(self.history) > 0:
             init_image = load_image(self.history[-1])
         else:
             # I no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
             init_image = Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8'))
-
-        model_name = self.checkpoint.get()
 
         if model_name == "Stable Diffusion 1.5":
             pipe = AutoPipelineForInpainting.from_pretrained(
@@ -269,16 +267,17 @@ class inpainting_ui:
             pipe.enable_model_cpu_offload()
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
-            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
-            generator = torch.Generator("cuda").manual_seed(int(self.generator_entry.get()))
-            #image = pipe(
-            #    prompt=prompt, 
-            #    image=init_image, 
-            #    mask_image=self.mask, 
-            #    generator=generator, 
-            #    strength=float(self.strength_entry.get()),
-            #    guidance_scale=float(self.guidance_entry.get())).images[0]
-            image = pipe(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
+            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
+            generator = torch.Generator("cuda").manual_seed(generator)
+
+            image = pipe(prompt=prompt, 
+                         image=init_image, 
+                         mask_image=self.mask, 
+                         generator=generator, 
+                         num_inference_steps=num_inference_steps, 
+                         #strength=float(self.strength_entry.get()),
+                         #guidance_scale=float(self.guidance_entry.get())
+            ).images[0]
         elif model_name == "Stable Diffusion XL 1.5":
             pipe = AutoPipelineForInpainting.from_pretrained(
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16"
@@ -286,9 +285,14 @@ class inpainting_ui:
             pipe.enable_model_cpu_offload()
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
-            generator = torch.Generator("cuda").manual_seed(int(self.generator_entry.get()))
-            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=int(self.blur_entry.get()))
-            image = pipe(prompt=prompt, image=init_image, mask_image=self.mask, generator=generator).images[0]
+            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
+            generator = torch.Generator("cuda").manual_seed(generator)
+            
+            image = pipe(prompt=prompt, 
+                         image=init_image, 
+                         mask_image=self.mask, 
+                         generator=generator, 
+                         num_inference_steps=num_inference_steps).images[0]
         elif model_name == "Kandinsky 2.2":
             pipe = AutoPipelineForInpainting.from_pretrained(
                 "kandinsky-community/kandinsky-2-2-decoder-inpaint", torch_dtype=torch.float16
@@ -296,7 +300,11 @@ class inpainting_ui:
             pipe.enable_model_cpu_offload()
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
-            image = pipe(prompt=prompt, negative_prompt=negative_prompt, image=init_image, mask_image=self.mask).images[0]
+
+            image = pipe(prompt=prompt, 
+                         negative_prompt=negative_prompt, 
+                         image=init_image, 
+                         mask_image=self.mask).images[0]
         else:
             print("Specify a supported model.\n")
             return
