@@ -72,6 +72,7 @@ Segmentation is on its own tab and not integrated with the rest of the app due t
 *Go to the Segmentation tab and push the Segment button to generate the segmented image.*
 
 ![](./assets/14.png)
+
 *And this is the full size segmented image.*
 
 ## Some other generated images
