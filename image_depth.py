@@ -92,7 +92,7 @@ class image_depth_ui:
         self.generate_button = create_toolbar_button(toolbar, "Generate Image", self.generate, 'Generate a new image')
 
         # Create a button to revert changes
-        self.undo_button = create_toolbar_button(toolbar, "Undo", self.undo, 'Undo the last generated image')
+        self.undo_button = create_toolbar_button(toolbar, "Undo", self.undo, 'Undo the last generated image', RIGHT)
 
     def refresh_ui(self):
         if len(self.history) > 0:

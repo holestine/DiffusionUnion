@@ -121,7 +121,7 @@ class inpainting_ui:
         self.super_res_button = create_toolbar_button(toolbar, "Super Res", self.super_res, 'Increase the image resolution')
 
         # Create a button to revert changes
-        self.undo_button = create_toolbar_button(toolbar, "Undo", self.undo, 'Undo the last generated image')
+        self.undo_button = create_toolbar_button(toolbar, "Undo", self.undo, 'Undo the last generated image', RIGHT)
         
     def checkpoint_selection_callback(self, *args):
         self.update_controls()
@@ -134,18 +134,21 @@ class inpainting_ui:
             self.radius_entry['state'] = NORMAL
             self.blur_entry['state'] = NORMAL
             self.generator_entry['state'] = NORMAL
+            self.inference_steps_entry['state'] = NORMAL
         elif checkpoint == "Stable Diffusion 2.1":
             self.negative_prompt['state'] = DISABLED
             self.negative_prompt['bg'] = '#D3D3D3'
             self.radius_entry['state'] = DISABLED
             self.blur_entry['state'] = DISABLED
             self.generator_entry['state'] = DISABLED
+            self.inference_steps_entry['state'] = DISABLED
         elif checkpoint == "Kandinsky 2.2":
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
             self.radius_entry['state'] = NORMAL
             self.blur_entry['state'] = DISABLED
             self.generator_entry['state'] = DISABLED
+            self.inference_steps_entry['state'] = DISABLED
 
         if len(self.history) >= 1:
             self.undo_button["state"] = NORMAL
@@ -163,6 +166,7 @@ class inpainting_ui:
     def refresh_ui(self):
 
         if len(self.history) > 0:
+            self.canvas.delete("all")
             self.canvas_bg = PhotoImage(file=self.history[-1])
             self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
             self.canvas.config(width=self.width, height=self.height)

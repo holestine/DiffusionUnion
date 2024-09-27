@@ -166,4 +166,6 @@ test_images/
 background.png
 notes.txt
 *.mp4
+private.py
+
 

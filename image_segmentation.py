@@ -9,17 +9,17 @@ import time
 from diffusers.utils import load_image, make_image_grid
 import numpy as np
 from PIL import Image
-from controls import create_toolbar_button
+from controls import create_toolbar_button, create_number_control
 
 DEBUG = False
 
 
-def show_masks_on_image(raw_image_path, masks):
+def show_masks_on_image(raw_image_path, masks, transparency=1.0):
 
     # Internal method to convert the mask to a transparent image
     def get_mask_image(mask):
         # Get a random color and add some transparency 
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+        color = np.concatenate([np.random.random(3), np.array([transparency])], axis=0)
 
         # Height and width are the last two dimensions
         h, w = mask.shape[-2:]
@@ -111,8 +111,14 @@ class image_segmentation_ui:
         checkpoint_menu.pack(side=LEFT, fill=X, expand=True)
         checkpoint_frame.pack(side=LEFT, fill=X, expand=False)
 
+        # Create textbox for entering the transparency of the segmentation
+        self.transparency_entry = create_number_control(toolbar, 0.6, "Transparency", 'Enter a value from 0 to 1. Higher values generally result in higher quality images but take longer.', increment=.05, type=float, min=0, max=1)
+        
         # Create a button to segment the image
         self.segment_button = create_toolbar_button(toolbar, 'Segment', self.segment, 'Segment the image')
+
+        # Create a button to caption the image
+        self.segment_button = create_toolbar_button(toolbar, 'Caption Image', self.caption, 'Caption the image')
 
     def refresh_ui(self):
         if len(self.history) > 0:
@@ -144,6 +150,7 @@ class image_segmentation_ui:
         # Get all necessary arguments from UI
         prompt     = self.prompt.get('1.0', 'end-1 chars')
         model_name = self.checkpoint.get()
+        transparency = float(self.transparency_entry.get())
 
         if len(self.history) > 0:
             init_image = load_image(self.history[-1])
@@ -155,8 +162,54 @@ class image_segmentation_ui:
         outputs = generator(init_image, points_per_batch=64)
 
         masks = outputs["masks"]
-        image = show_masks_on_image(self.history[-1], masks)
+        image = show_masks_on_image(self.history[-1], masks, transparency)
         self.update_canvas_image(image)
+
+        # Use to validate inputs and outputs
+        if DEBUG:
+            print(prompt)
+            print(model_name)
+
+    def remove(self):
+        if DEBUG:
+            self.caption()
+        else:
+            threading.Thread(target=self.caption).start()
+
+    def caption(self):
+        captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
+        text = captioner(self.history[-1])
+
+        self.prompt["state"] = NORMAL
+        self.prompt.insert(END, '\n'+text[0]['generated_text'])
+        self.prompt["state"] = DISABLED
+
+
+# Experiments with background removal 
+        return
+
+        mm_pipeline = pipeline("image-to-text",model="llava-hf/llava-1.5-7b-hf")
+        text = mm_pipeline("https://huggingface.co/spaces/llava-hf/llava-4bit/resolve/main/examples/baklava.png", "How to make this pastry?")
+        self.prompt.set(text)
+
+        return
+        # Get all necessary arguments from UI
+        prompt     = self.prompt.get('1.0', 'end-1 chars')
+        model_name = self.checkpoint.get()
+
+        if len(self.history) > 0:
+            init_image = load_image(self.history[-1])
+        else:
+            # If no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
+            init_image = Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8'))
+
+
+        image_path = self.history[-1]
+        pipe = pipeline("image-segmentation", model="briaai/RMBG-1.4", trust_remote_code=True)
+        pillow_mask = pipe(image_path, return_mask = True) # outputs a pillow mask
+        self.update_canvas_image(pillow_mask)
+        pillow_image = pipe(image_path)
+        self.update_canvas_image(pillow_image)
 
         # Use to validate inputs and outputs
         if DEBUG:

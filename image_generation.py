@@ -2,10 +2,12 @@ from tkinter import *
 from tkinter import filedialog
 from idlelib.tooltip import Hovertip
 import threading
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline
 import torch
 import time
 from controls import create_toolbar_button
+from huggingface_hub import login
+from private import hugging_face_token
 
 DEBUG = False
 
@@ -18,6 +20,12 @@ class image_generation_ui:
 
         # Use GPU if available
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # Login into HuggingFace to use Stable Diffusion 3
+        try:
+            login(hugging_face_token) # had to get a READ token from https://huggingface.co/settings/tokens/new
+        except:
+            print("Hugging face login failed")
 
         # Size of image to work with
         self.width = width
@@ -68,7 +76,7 @@ class image_generation_ui:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 2.1"]
+        checkpoint_options = ["Stable Diffusion 2.1", "Stable Diffusion 3"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the model to use')
         Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -129,6 +137,14 @@ class image_generation_ui:
             pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16).to(self.device)
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
             image = pipe(prompt=prompt).images[0]
+        elif model_name == "Stable Diffusion 3":
+            pipe = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", torch_dtype=torch.float16).to(self.device)
+            image = pipe(
+                prompt,
+                negative_prompt="",
+                num_inference_steps=28,
+                guidance_scale=7.0,
+            ).images[0]
         else:
             print("Specify a supported model.\n")
             return

@@ -64,8 +64,8 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
     frame.pack(side=LEFT, fill=BOTH, expand=False)
     return entry
 
-def create_toolbar_button(parent, text, event_handler, tooltip):
+def create_toolbar_button(parent, text, event_handler, tooltip, side=LEFT):
     button = Button(parent, text=text, command=event_handler)
     Hovertip(button, tooltip)
-    button.pack(side=LEFT, fill=X, expand=False)
+    button.pack(side=side, fill=X, expand=False)
     return button
