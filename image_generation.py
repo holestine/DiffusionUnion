@@ -2,7 +2,8 @@ from tkinter import *
 from tkinter import filedialog
 from idlelib.tooltip import Hovertip
 import threading
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline, FluxPipeline
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline
+from diffusers import FluxPipeline, DPMSolverMultistepScheduler, KolorsPipeline, DiffusionPipeline, EDMDPMSolverMultistepScheduler
 import torch
 import time
 from controls import create_toolbar_button
@@ -76,7 +77,7 @@ class image_generation_ui:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 2.1", "Stable Diffusion 3", "FLUX.1-dev"]
+        checkpoint_options = ["Stable Diffusion 2.1", "Stable Diffusion 3", "FLUX.1-dev", "Kolors", "Playground-v2.5"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the model to use')
         Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -158,6 +159,27 @@ class image_generation_ui:
                 max_sequence_length=512,
                 generator=torch.Generator("cpu").manual_seed(0)
             ).images[0]
+        elif model_name == "Kolors":
+            pipe = KolorsPipeline.from_pretrained("Kwai-Kolors/Kolors-diffusers", torch_dtype=torch.float16, variant="fp16").to(self.device)
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, use_karras_sigmas=True)
+
+            image = pipe(
+                prompt,
+                negative_prompt="",
+                guidance_scale=6.5,
+                num_inference_steps=25,
+            ).images[0]
+        elif model_name == "Playground-v2.5":
+            pipe = DiffusionPipeline.from_pretrained(
+                "playgroundai/playground-v2.5-1024px-aesthetic",
+                torch_dtype=torch.float16,
+                variant="fp16",
+            ).to(self.device)
+
+            # Optional: Use DPM++ 2M Karras scheduler for crisper fine details
+            pipe.scheduler = EDMDPMSolverMultistepScheduler()
+
+            image = pipe(prompt=prompt, num_inference_steps=50, guidance_scale=3).images[0]
         else:
             print("Specify a supported model.\n")
             return
