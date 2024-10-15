@@ -2,7 +2,7 @@ from tkinter import *
 from tkinter import filedialog
 from idlelib.tooltip import Hovertip
 import threading
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline, FluxPipeline
 import torch
 import time
 from controls import create_toolbar_button
@@ -66,7 +66,7 @@ class image_generation_ui:
 
     def initialize_prompts(self, parent):
         # Create text box for entering the prompt
-        prompt = "a photograph of a highly forested area in the arctic near a frozen waterfall with rocky cliffs, highly detailed, 8k, realistic"
+        prompt = "Inside a Victorian-era laboratory filled with steampunk gadgets and machinery. A scientist in a leather apron and goggles works on a complex contraption made of brass, gears, and glass tubes filled with glowing liquids. The room is illuminated by warm, flickering gas lamps, and in the background, a large clockwork mechanism slowly turns, powering the various devices scattered around the room."
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
         self.prompt = Text(parent, height=1, wrap=WORD)
         self.prompt.insert(END, prompt)
@@ -76,7 +76,7 @@ class image_generation_ui:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 2.1", "Stable Diffusion 3"]
+        checkpoint_options = ["Stable Diffusion 2.1", "Stable Diffusion 3", "FLUX.1-dev"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the model to use')
         Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -144,6 +144,19 @@ class image_generation_ui:
                 negative_prompt="",
                 num_inference_steps=28,
                 guidance_scale=7.0,
+            ).images[0]
+        elif model_name == "FLUX.1-dev":
+            pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", torch_dtype=torch.bfloat16)
+            pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+
+            image = pipe(
+                prompt,
+                height=1024,
+                width=1024,
+                guidance_scale=3.5,
+                num_inference_steps=50,
+                max_sequence_length=512,
+                generator=torch.Generator("cpu").manual_seed(0)
             ).images[0]
         else:
             print("Specify a supported model.\n")
