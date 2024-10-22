@@ -4,11 +4,18 @@ from idlelib.tooltip import Hovertip
 import threading
 from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline
 from diffusers import FluxPipeline, DPMSolverMultistepScheduler, KolorsPipeline, DiffusionPipeline, EDMDPMSolverMultistepScheduler
+from diffusers import StableDiffusionXLControlNetInpaintPipeline, ControlNetModel
+from diffusers.utils import load_image
 import torch
 import time
 from controls import create_toolbar_button
 from huggingface_hub import login
 from private import hugging_face_token
+from transformers import pipeline
+from PIL import Image
+import numpy as np
+from matplotlib import pyplot as plt
+
 
 DEBUG = False
 
@@ -91,6 +98,9 @@ class image_generation_ui:
 
         # Create a button to generate the image
         self.generate_button = create_toolbar_button(toolbar, 'Generate Image', self.generate, 'Generate a new image')
+
+        # Create a button to generate a chrome ball
+        self.chrome_ball_button = create_toolbar_button(toolbar, 'Generate Chrome Ball', self.create_chrome_ball, 'Generate a chrome ball for a light probe')
 
         # Create a button to revert changes
         self.undo_button = create_toolbar_button(toolbar, 'Undo', self.undo, 'Undo the last generated image')
@@ -191,6 +201,70 @@ class image_generation_ui:
 
         self.update_canvas_image(image)
         
+    def create_chrome_ball(self):
+
+        # Configuration
+        IS_UNDER_EXPOSURE = False #change this option for output underexposured ball 
+        if IS_UNDER_EXPOSURE:
+            PROMPT = "a perfect black dark mirrored reflective chrome ball sphere"
+        else:
+            PROMPT = "a perfect mirrored reflective chrome ball sphere"
+
+        NEGATIVE_PROMPT = "matte, diffuse, flat, dull"
+
+        # load pipeline
+        controlnet = ControlNetModel.from_pretrained("diffusers/controlnet-depth-sdxl-1.0", torch_dtype=torch.float16)
+        pipe = StableDiffusionXLControlNetInpaintPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            controlnet=controlnet,
+            torch_dtype=torch.float16,
+        ).to("cuda")
+        pipe.load_lora_weights("DiffusionLight/DiffusionLight")
+        pipe.fuse_lora(lora_scale=0.75)
+        depth_estimator = pipeline(task="depth-estimation", model="Intel/dpt-large")
+
+        # prepare input image
+        init_image = load_image(self.history[-1])
+        depth_image = depth_estimator(images=init_image)['depth']
+
+        # create mask and depth map with mask for inpainting
+        def get_circle_mask(size=256):
+            x = torch.linspace(-1, 1, size)
+            y = torch.linspace(1, -1, size)
+            y, x = torch.meshgrid(y, x)
+            z = (1 - x**2 - y**2)
+            mask = z >= 0
+            return mask 
+        
+        # Get the mask for the chrome ball
+        ball_size = 100
+        mask = get_circle_mask(size=ball_size).numpy()
+        depth = np.asarray(depth_image).copy()
+        top = int(depth.shape[1]/2 - int(ball_size/2))
+        left = int(depth.shape[0]/2 - int(ball_size/2))
+        depth[left:left+ball_size, top:top+ball_size] = depth[left:left+ball_size, top:top+ball_size] * (1 - mask) + (mask * 255)
+        depth_mask = Image.fromarray(depth)
+        mask_image = np.zeros_like(depth)
+        mask_image[left:left+ball_size, top:top+ball_size] = mask * 255
+        mask_image = Image.fromarray(mask_image)
+
+        #plt.imshow(depth_mask)
+        #plt.show()
+
+        # run the pipeline
+        output = pipe(
+            prompt=PROMPT,
+            negative_prompt=NEGATIVE_PROMPT,
+            num_inference_steps=30,
+            image=init_image,
+            mask_image=mask_image,
+            control_image=depth_mask,
+            controlnet_conditioning_scale=0.5,
+        )
+
+        image = output["images"][0]
+        self.update_canvas_image(image)
+
     def load_background(self):
         res = filedialog.askopenfile(initialdir="./history")
         if res:

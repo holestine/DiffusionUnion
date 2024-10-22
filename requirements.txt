@@ -6,3 +6,4 @@ xformers
 diffusers
 transformers
 matplotlib
+peft

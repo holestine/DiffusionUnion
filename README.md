@@ -12,6 +12,8 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 pip install -r requirements.txt
 ```
 
+Download LoRA weights [here](https://huggingface.co/DiffusionLight/DiffusionLight/tree/main) and put them in the root directory.
+
 # Guide
 This application exposes some of the image editing and content creation capabilities of deep learning models through a graphical user interface. It makes the features more accessible to those who want to avoid the code complexities involved in performing a sequence of these operations using a variety of masks and models. You'll need a GPU to run most of these, mine is 12GB.
 

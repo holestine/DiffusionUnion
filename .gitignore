@@ -167,5 +167,5 @@ background.png
 notes.txt
 *.mp4
 private.py
-
+pytorch_lora_weights.safetensors
 
