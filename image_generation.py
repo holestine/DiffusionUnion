@@ -237,7 +237,7 @@ class image_generation_ui:
             return mask 
         
         # Get the mask for the chrome ball
-        ball_size = 100
+        ball_size = 256
         mask = get_circle_mask(size=ball_size).numpy()
         depth = np.asarray(depth_image).copy()
         top = int(depth.shape[1]/2 - int(ball_size/2))
