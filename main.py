@@ -6,7 +6,7 @@ import os
 import image_generation as generation
 import image_segmentation as segmentation
 import image_inpainting as inpainting
-import image_depth      as depth
+#import image_depth      as depth
 import image_to_vid
 
 # Disable warning, may be bug in some versions of PyTorch
@@ -48,9 +48,9 @@ class DiffusionUnionUI:
         self.inpainting_tab = inpainting.inpainting_ui(inpainting_tab, self.history)
         self.tabControl.add(inpainting_tab, text=INPAINTING_TAB_NAME) 
 
-        depth_tab = Frame(self.tabControl)
-        self.depth_tab = depth.image_depth_ui(depth_tab, self.history)
-        self.tabControl.add(depth_tab, text=DEPTH_TAB_NAME)
+        #depth_tab = Frame(self.tabControl)
+        #self.depth_tab = depth.image_depth_ui(depth_tab, self.history)
+        #self.tabControl.add(depth_tab, text=DEPTH_TAB_NAME)
         
         if DEV_MODE:
             image_to_vid_tab = Frame(self.tabControl)

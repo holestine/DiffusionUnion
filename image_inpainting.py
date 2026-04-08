@@ -1,14 +1,17 @@
 from tkinter import *
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 from idlelib.tooltip import Hovertip
 from diffusers.utils import load_image, make_image_grid
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import threading
-from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline
+from diffusers import AutoPipelineForInpainting, LDMSuperResolutionPipeline, FluxFillPipeline, StableDiffusionUpscalePipeline
 import torch
 import time
 import numpy as np
+import warnings
+warnings.filterwarnings("ignore", message=".*UNEXPECTED.*")
+
 from controls import create_number_control, create_toolbar_button
 
 DEBUG = False
@@ -72,13 +75,13 @@ class inpainting_ui:
         # Create text box for entering the prompt
         prompt = "a photograph of an alien space ship with a metallic and mechanical appearance hovering above the ground in a highly forested area in the arctic near a frozen waterfall and rocky cliffs, highly detailed, 8k, realistic, stars in the sky, colorful"
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
-        self.prompt = Text(parent, height=1, wrap=WORD)
+        self.prompt = Text(parent, height=1, wrap=WORD, pady=4)
         self.prompt.insert(END, prompt)
         self.prompt.pack(side=TOP, fill=BOTH, expand=True)
 
         # Create text box for entering negative prompt
         Label(parent, text="Negative Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
-        self.negative_prompt = Text(parent, height=1, wrap=WORD)
+        self.negative_prompt = Text(parent, height=1, wrap=WORD, pady=4)
         self.negative_prompt.insert(END, "bad anatomy, deformed, ugly, poor details, blurry")
         self.negative_prompt.pack(side=TOP, fill=BOTH, expand=True)
 
@@ -86,7 +89,7 @@ class inpainting_ui:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 1.5", "Stable Diffusion XL 1.5", "Kandinsky 2.2"]
+        checkpoint_options = ["Stable Diffusion 1.5", "Stable Diffusion XL 1.5", "Kandinsky 2.2", "FLUX.1 Fill"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the diffusion model to use')
         Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -108,14 +111,22 @@ class inpainting_ui:
         # Create a control for entering the generator value
         self.inference_steps_entry = create_number_control(toolbar, 200, 'Inference Steps', 'Higher values produce better images but take longer.', min=1, max=999)
 
-        # Create textbox for entering the guidance value
-        #self.guidance_entry = create_number_control(toolbar, 7.5, "Guidance", 'Enter a numeric value. Values between 7 and 8.5 are usually good choices, the default is 7.5. Higher values should make the image more closely match the prompt.')
-
         # Create a button to generate the image
         self.generate_button = create_toolbar_button(toolbar, "Generate", self.generate, 'Generate a new image')
 
         # Create a button to clear the canvas
         self.clear_button = create_toolbar_button(toolbar, "Clear Mask", self.clear_mask, 'Clear the current mask')
+
+        # Create combo box for selecting a super res model
+        super_res_frame = Frame(toolbar, bg='grey')
+        super_res_options = ["LDM (small images)", "SD x4 Upscaler (large images)"]
+        self.super_res_model = StringVar(super_res_frame, super_res_options[0])
+        Hovertip(super_res_frame, 'Select the super resolution model to use')
+        Label(super_res_frame, text="Super Res Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
+        super_res_menu = OptionMenu(super_res_frame, self.super_res_model, *super_res_options)
+        super_res_menu.config(width=20)
+        super_res_menu.pack(side=LEFT, fill=X, expand=True)
+        super_res_frame.pack(side=LEFT, fill=X, expand=False)
 
         # Create a button to increase the image's resolution
         self.super_res_button = create_toolbar_button(toolbar, "Super Res", self.super_res, 'Increase the image resolution')
@@ -135,13 +146,6 @@ class inpainting_ui:
             self.blur_entry['state'] = NORMAL
             self.generator_entry['state'] = NORMAL
             self.inference_steps_entry['state'] = NORMAL
-        elif checkpoint == "Stable Diffusion 2.1":
-            self.negative_prompt['state'] = DISABLED
-            self.negative_prompt['bg'] = '#D3D3D3'
-            self.radius_entry['state'] = DISABLED
-            self.blur_entry['state'] = DISABLED
-            self.generator_entry['state'] = DISABLED
-            self.inference_steps_entry['state'] = DISABLED
         elif checkpoint == "Kandinsky 2.2":
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
@@ -149,6 +153,15 @@ class inpainting_ui:
             self.blur_entry['state'] = DISABLED
             self.generator_entry['state'] = DISABLED
             self.inference_steps_entry['state'] = DISABLED
+        elif checkpoint == "FLUX.1 Fill":
+            self.negative_prompt['state'] = DISABLED
+            self.negative_prompt['bg'] = '#D3D3D3'
+            self.radius_entry['state'] = NORMAL
+            self.blur_entry['state'] = NORMAL
+            self.generator_entry['state'] = NORMAL
+            self.inference_steps_entry['state'] = NORMAL
+            self.inference_steps_entry.delete(0, END)
+            self.inference_steps_entry.insert(0, '50')
 
         if len(self.history) >= 1:
             self.undo_button["state"] = NORMAL
@@ -209,18 +222,21 @@ class inpainting_ui:
         self.drawing = False
 
     def super_res(self):
-        if DEBUG:
-            self.super_res_thread()
+        if self.super_res_model.get() == "SD x4 Upscaler (large images)":
+            target = self.sd_x4_upscaler_thread
         else:
-            threading.Thread(target=self.super_res_thread).start()
+            target = self.super_res_thread
+        if DEBUG:
+            target()
+        else:
+            threading.Thread(target=target).start()
 
     def super_res_thread(self):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
         model_id = "CompVis/ldm-super-resolution-4x-openimages"
 
         # load model and scheduler
-        pipeline = LDMSuperResolutionPipeline.from_pretrained(model_id)
-        pipeline = pipeline.to(device)
+        pipeline = LDMSuperResolutionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
+        self._apply_offload(pipeline, vram_needed_gb=2)
 
         # Get the current image, may be able to pull this from self.canvas
         low_res_img = Image.open(self.history[-1]).convert("RGB")
@@ -230,19 +246,65 @@ class inpainting_ui:
         if len(x) > 0 and len(y) > 0:
             low_res_img = low_res_img.crop((min(x), min(y), max(x), max(y)))
 
+        # LDM super res was designed for small inputs (~128px) and outputs 4x that size.
+        # Feeding a large image (e.g. 1024px FLUX output) blows up activation memory.
+        max_input_size = 128
+        if max(low_res_img.size) > max_input_size:
+            low_res_img.thumbnail((max_input_size, max_input_size), Image.LANCZOS)
+
         # Super Res the image
         try:
             super_res_image = pipeline(low_res_img, num_inference_steps=100, eta=1).images[0]
             self.update_canvas_image(super_res_image)
         except Exception as ex:
             print(ex)
-            messagebox.showinfo("Error", ex.args[0]) 
+            messagebox.showinfo("Error", ex.args[0])
+        finally:
+            del pipeline
+            torch.cuda.empty_cache()
 
         # Use to validate inputs and outputs
         if DEBUG:
             plt.imshow(make_image_grid([low_res_img], rows=1, cols=1))
             plt.show()
     
+    def sd_x4_upscaler_thread(self):
+        pipeline = StableDiffusionUpscalePipeline.from_pretrained(
+            "stabilityai/stable-diffusion-x4-upscaler", torch_dtype=torch.float16
+        )
+        self._apply_offload(pipeline, vram_needed_gb=8)
+
+        prompt = self.prompt.get('1.0', 'end-1 chars')
+        low_res_img = Image.open(self.history[-1]).convert("RGB")
+
+        # Determine mask bounding box and crop to it if a mask exists
+        y, x = np.nonzero(self.mask)
+        if len(x) > 0 and len(y) > 0:
+            low_res_img = low_res_img.crop((min(x), min(y), max(x), max(y)))
+
+        # Model accepts up to 512x512 input, outputs 4x that (up to 2048x2048)
+        low_res_img.thumbnail((512, 512), Image.LANCZOS)
+
+        try:
+            super_res_image = pipeline(prompt=prompt, image=low_res_img).images[0]
+            self.update_canvas_image(super_res_image)
+        except Exception as ex:
+            print(ex)
+            messagebox.showinfo("Error", ex.args[0])
+        finally:
+            del pipeline
+            torch.cuda.empty_cache()
+
+    def _apply_offload(self, pipe, vram_needed_gb):
+        total_vram_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        if total_vram_gb >= vram_needed_gb:
+            pipe.to("cuda")
+        else:
+            pipe.enable_sequential_cpu_offload()
+            if hasattr(pipe, 'vae'):
+                pipe.vae.enable_slicing()
+                pipe.vae.enable_tiling()
+
     def generate(self):
         if DEBUG:
             self.generate_thread()
@@ -268,47 +330,62 @@ class inpainting_ui:
             pipe = AutoPipelineForInpainting.from_pretrained(
                 "runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16, variant="fp16"
             )
-            pipe.enable_model_cpu_offload()
+            self._apply_offload(pipe, vram_needed_gb=10)
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
             self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
             generator = torch.Generator("cuda").manual_seed(generator)
 
-            image = pipe(prompt=prompt, 
-                         image=init_image, 
-                         mask_image=self.mask, 
-                         generator=generator, 
-                         num_inference_steps=num_inference_steps, 
-                         #strength=float(self.strength_entry.get()),
-                         #guidance_scale=float(self.guidance_entry.get())
-            ).images[0]
+            image = pipe(prompt=prompt,
+                         image=init_image,
+                         mask_image=self.mask,
+                         generator=generator,
+                         num_inference_steps=num_inference_steps).images[0]
         elif model_name == "Stable Diffusion XL 1.5":
             pipe = AutoPipelineForInpainting.from_pretrained(
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16"
             )
-            pipe.enable_model_cpu_offload()
+            self._apply_offload(pipe, vram_needed_gb=12)
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
             self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
             generator = torch.Generator("cuda").manual_seed(generator)
-            
-            image = pipe(prompt=prompt, 
-                         image=init_image, 
-                         mask_image=self.mask, 
-                         generator=generator, 
+
+            image = pipe(prompt=prompt,
+                         image=init_image,
+                         mask_image=self.mask,
+                         generator=generator,
                          num_inference_steps=num_inference_steps).images[0]
         elif model_name == "Kandinsky 2.2":
             pipe = AutoPipelineForInpainting.from_pretrained(
                 "kandinsky-community/kandinsky-2-2-decoder-inpaint", torch_dtype=torch.float16
             )
-            pipe.enable_model_cpu_offload()
+            self._apply_offload(pipe, vram_needed_gb=12)
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
 
-            image = pipe(prompt=prompt, 
-                         negative_prompt=negative_prompt, 
-                         image=init_image, 
+            image = pipe(prompt=prompt,
+                         negative_prompt=negative_prompt,
+                         image=init_image,
                          mask_image=self.mask).images[0]
+        elif model_name == "FLUX.1 Fill":
+            pipe = FluxFillPipeline.from_pretrained(
+                "black-forest-labs/FLUX.1-Fill-dev", torch_dtype=torch.bfloat16
+            )
+            self._apply_offload(pipe, vram_needed_gb=24)
+            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
+            generator = torch.Generator("cpu").manual_seed(generator)
+
+            image = pipe(
+                prompt=prompt,
+                image=init_image,
+                mask_image=self.mask,
+                height=self.height,
+                width=self.width,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=30,
+                generator=generator,
+            ).images[0]
         else:
             print("Specify a supported model.\n")
             return
@@ -323,3 +400,5 @@ class inpainting_ui:
 
         self.clear_mask()
         self.update_canvas_image(image)
+        del pipe
+        torch.cuda.empty_cache()

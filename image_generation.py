@@ -2,12 +2,15 @@ from tkinter import *
 from tkinter import filedialog
 from idlelib.tooltip import Hovertip
 import threading
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusion3Pipeline, StableDiffusionXLPipeline
 from diffusers import FluxPipeline, DPMSolverMultistepScheduler, KolorsPipeline, DiffusionPipeline, EDMDPMSolverMultistepScheduler
 from diffusers import StableDiffusionXLControlNetInpaintPipeline, ControlNetModel
 from diffusers.utils import load_image
 import torch
 import time
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*upcast_vae.*")
+warnings.filterwarnings("ignore", message=".*Siglip2ImageProcessorFast.*")
 from controls import create_toolbar_button
 from huggingface_hub import login
 from private import hugging_face_token
@@ -15,6 +18,9 @@ from transformers import pipeline
 from PIL import Image
 import numpy as np
 from matplotlib import pyplot as plt
+
+import warnings
+warnings.filterwarnings("ignore", message=".*Siglip2ImageProcessorFast.*")
 
 
 DEBUG = False
@@ -76,7 +82,7 @@ class image_generation_ui:
         # Create text box for entering the prompt
         prompt = "Inside a Victorian-era laboratory filled with steampunk gadgets and machinery. A scientist in a leather apron and goggles works on a complex contraption made of brass, gears, and glass tubes filled with glowing liquids. The room is illuminated by warm, flickering gas lamps, and in the background, a large clockwork mechanism slowly turns, powering the various devices scattered around the room."
         Label(parent, text="Positive Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
-        self.prompt = Text(parent, height=1, wrap=WORD)
+        self.prompt = Text(parent, height=1, wrap=WORD, pady=4)
         self.prompt.insert(END, prompt)
         self.prompt.pack(side=TOP, fill=BOTH, expand=True)
 
@@ -84,7 +90,7 @@ class image_generation_ui:
         
         # Create combo box for selecting a diffusion model
         checkpoint_frame = Frame(toolbar, bg='grey')
-        checkpoint_options = ["Stable Diffusion 2.1", "Stable Diffusion 3", "FLUX.1-dev", "Kolors", "Playground-v2.5"]
+        checkpoint_options = ["Stable Diffusion XL", "Stable Diffusion 3", "FLUX.1-dev", "FLUX.1-schnell", "Kolors", "Playground-v2.5"]
         self.checkpoint = StringVar(checkpoint_frame, checkpoint_options[0])
         Hovertip(checkpoint_frame, 'Select the model to use')
         Label(checkpoint_frame, text="Model", anchor=W).pack(side=LEFT, fill=Y, expand=False)
@@ -100,7 +106,7 @@ class image_generation_ui:
         self.generate_button = create_toolbar_button(toolbar, 'Generate Image', self.generate, 'Generate a new image')
 
         # Create a button to generate a chrome ball
-        self.chrome_ball_button = create_toolbar_button(toolbar, 'Generate Chrome Ball', self.create_chrome_ball, 'Generate a chrome ball for a light probe')
+        #self.chrome_ball_button = create_toolbar_button(toolbar, 'Generate Chrome Ball', self.create_chrome_ball, 'Generate a chrome ball for a light probe')
 
         # Create a button to revert changes
         self.undo_button = create_toolbar_button(toolbar, 'Undo', self.undo, 'Undo the last generated image')
@@ -132,6 +138,16 @@ class image_generation_ui:
         self.history.pop()
         self.refresh_ui()
 
+    def _apply_offload(self, pipe, vram_needed_gb):
+        total_vram_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        if total_vram_gb >= vram_needed_gb:
+            pipe.to(self.device)
+        else:
+            pipe.enable_sequential_cpu_offload()
+            if hasattr(pipe, 'vae'):
+                pipe.vae.enable_slicing()
+                pipe.vae.enable_tiling()
+
     def generate(self):
         if DEBUG:
             self.generate_thread()
@@ -143,13 +159,15 @@ class image_generation_ui:
         prompt     = self.prompt.get('1.0', 'end-1 chars')
         model_name = self.checkpoint.get()
 
-        if model_name == "Stable Diffusion 2.1":
-            # https://huggingface.co/stabilityai/stable-diffusion-2-1
-            pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16).to(self.device)
+        if model_name == "Stable Diffusion XL":
+            # https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
+            pipe = StableDiffusionXLPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16)
+            self._apply_offload(pipe, vram_needed_gb=12)
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
             image = pipe(prompt=prompt).images[0]
         elif model_name == "Stable Diffusion 3":
-            pipe = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3-medium-diffusers", torch_dtype=torch.float16).to(self.device)
+            pipe = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-large", torch_dtype=torch.float16)
+            self._apply_offload(pipe, vram_needed_gb=14)
             image = pipe(
                 prompt,
                 negative_prompt="",
@@ -158,8 +176,7 @@ class image_generation_ui:
             ).images[0]
         elif model_name == "FLUX.1-dev":
             pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", torch_dtype=torch.bfloat16)
-            pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
-
+            self._apply_offload(pipe, vram_needed_gb=24)
             image = pipe(
                 prompt,
                 height=1024,
@@ -169,8 +186,22 @@ class image_generation_ui:
                 max_sequence_length=512,
                 generator=torch.Generator("cpu").manual_seed(0)
             ).images[0]
+        elif model_name == "FLUX.1-schnell":
+            # https://huggingface.co/black-forest-labs/FLUX.1-schnell
+            pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
+            self._apply_offload(pipe, vram_needed_gb=24)
+            image = pipe(
+                prompt,
+                height=1024,
+                width=1024,
+                guidance_scale=0.0,
+                num_inference_steps=4,
+                max_sequence_length=256,
+                generator=torch.Generator("cpu").manual_seed(0)
+            ).images[0]
         elif model_name == "Kolors":
-            pipe = KolorsPipeline.from_pretrained("Kwai-Kolors/Kolors-diffusers", torch_dtype=torch.float16, variant="fp16").to(self.device)
+            pipe = KolorsPipeline.from_pretrained("Kwai-Kolors/Kolors-diffusers", torch_dtype=torch.float16, variant="fp16")
+            self._apply_offload(pipe, vram_needed_gb=12)
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, use_karras_sigmas=True)
 
             image = pipe(
@@ -184,7 +215,8 @@ class image_generation_ui:
                 "playgroundai/playground-v2.5-1024px-aesthetic",
                 torch_dtype=torch.float16,
                 variant="fp16",
-            ).to(self.device)
+            )
+            self._apply_offload(pipe, vram_needed_gb=12)
 
             # Optional: Use DPM++ 2M Karras scheduler for crisper fine details
             pipe.scheduler = EDMDPMSolverMultistepScheduler()
@@ -200,7 +232,9 @@ class image_generation_ui:
             print(model_name)
 
         self.update_canvas_image(image)
-        
+        del pipe
+        torch.cuda.empty_cache()
+
     def create_chrome_ball(self):
 
         # Configuration
@@ -218,9 +252,10 @@ class image_generation_ui:
             "stabilityai/stable-diffusion-xl-base-1.0",
             controlnet=controlnet,
             torch_dtype=torch.float16,
-        ).to("cuda")
-        pipe.load_lora_weights("DiffusionLight/DiffusionLight")
-        pipe.fuse_lora(lora_scale=0.75)
+        )
+        pipe.load_lora_weights("DiffusionLight/DiffusionLight", weight_name="pytorch_lora_weights.safetensors", adapter_name="diffusionlight")
+        pipe.set_adapters("diffusionlight", adapter_weights=0.75)
+        self._apply_offload(pipe, vram_needed_gb=12)
         depth_estimator = pipeline(task="depth-estimation", model="Intel/dpt-large")
 
         # prepare input image

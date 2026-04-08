@@ -3,6 +3,7 @@ from tkinter import filedialog
 from idlelib.tooltip import Hovertip
 import threading
 from transformers import SamModel, SamProcessor
+from transformers import BlipProcessor, BlipForConditionalGeneration
 from transformers import pipeline
 import torch
 import time
@@ -18,6 +19,10 @@ def show_masks_on_image(raw_image_path, masks, transparency=1.0):
 
     # Internal method to convert the mask to a transparent image
     def get_mask_image(mask):
+
+        if isinstance(mask, torch.Tensor):
+            mask = mask.numpy()
+            
         # Get a random color and add some transparency 
         color = np.concatenate([np.random.random(3), np.array([transparency])], axis=0)
 
@@ -94,7 +99,7 @@ class image_segmentation_ui:
         # Create text box for entering the prompt
         prompt = ""
         Label(parent, text="Prompt:", anchor=W).pack(side=TOP, fill=X, expand=False)
-        self.prompt = Text(parent, height=1, wrap=WORD)
+        self.prompt = Text(parent, height=1, wrap=WORD, pady=4)
         self.prompt.insert(END, prompt)
         self.prompt.pack(side=TOP, fill=BOTH, expand=True)
 
@@ -177,43 +182,13 @@ class image_segmentation_ui:
             threading.Thread(target=self.caption).start()
 
     def caption(self):
-        captioner = pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
-        text = captioner(self.history[-1])
+        model_name = "Salesforce/blip-image-captioning-base"
+        processor = BlipProcessor.from_pretrained(model_name)
+        model = BlipForConditionalGeneration.from_pretrained(model_name)
+        inputs = processor(images=self.history[-1], return_tensors="pt")
+        out = model.generate(**inputs)
+        text = [{"generated_text": processor.decode(out[0], skip_special_tokens=True)}]
 
         self.prompt["state"] = NORMAL
         self.prompt.insert(END, '\n'+text[0]['generated_text'])
         self.prompt["state"] = DISABLED
-
-
-# Experiments with background removal 
-        return
-
-        mm_pipeline = pipeline("image-to-text",model="llava-hf/llava-1.5-7b-hf")
-        text = mm_pipeline("https://huggingface.co/spaces/llava-hf/llava-4bit/resolve/main/examples/baklava.png", "How to make this pastry?")
-        self.prompt.set(text)
-
-        return
-        # Get all necessary arguments from UI
-        prompt     = self.prompt.get('1.0', 'end-1 chars')
-        model_name = self.checkpoint.get()
-
-        if len(self.history) > 0:
-            init_image = load_image(self.history[-1])
-        else:
-            # If no image use all black (noise didn't work as well *np.random.randint(0, 255, (self.height, self.width, 3), "uint8")*)
-            init_image = Image.fromarray(np.zeros((self.width, self.height, 3), 'uint8'))
-
-
-        image_path = self.history[-1]
-        pipe = pipeline("image-segmentation", model="briaai/RMBG-1.4", trust_remote_code=True)
-        pillow_mask = pipe(image_path, return_mask = True) # outputs a pillow mask
-        self.update_canvas_image(pillow_mask)
-        pillow_image = pipe(image_path)
-        self.update_canvas_image(pillow_image)
-
-        # Use to validate inputs and outputs
-        if DEBUG:
-            print(prompt)
-            print(model_name)
-
-

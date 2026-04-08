@@ -124,12 +124,14 @@ class image_to_vid:
 
         if model_name == "ModelScopeT2V":
 
-            pipeline = DiffusionPipeline.from_pretrained("damo-vilab/text-to-video-ms-1.7b", torch_dtype=torch.float16, variant="fp16")
-            pipeline.enable_model_cpu_offload()
-            pipeline.enable_vae_slicing()
+            pipe = DiffusionPipeline.from_pretrained("damo-vilab/text-to-video-ms-1.7b", torch_dtype=torch.float16, variant="fp16")
+            pipe.enable_model_cpu_offload()
+            if torch.cuda.get_device_properties(0).total_memory < 12 * 1024**3:
+                pipe.vae.enable_slicing()
+                pipe.vae.enable_tiling()
 
             prompt = self.prompt.get('1.0', 'end-1 chars')
-            video_frames = pipeline(prompt).frames[0]
+            video_frames = pipe(prompt).frames[0]
             export_to_video(video_frames, "generated.mp4", fps=5)
 
 
@@ -152,7 +154,9 @@ class image_to_vid:
             steps_offset=1,
         )
         pipeline.scheduler = scheduler
-        pipeline.enable_vae_slicing()
+        if torch.cuda.get_device_properties(0).total_memory < 12 * 1024**3:
+            pipe.vae.enable_slicing()
+            pipe.vae.enable_tiling()
         pipeline.enable_model_cpu_offload()
 
         output = pipeline(

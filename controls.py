@@ -2,7 +2,7 @@ from tkinter import *
 from idlelib.tooltip import Hovertip
 import numpy as np
 
-def create_number_control(parent, default, text, tip="", increment=1, type=int, min=-np.Infinity, max=np.Infinity):
+def create_number_control(parent, default, text, tip="", increment=1, type=int, min=-np.inf, max=np.inf):
 
     def decrease():
         new_value = type(round((type(entry.get())-type(increment))*100)/100)

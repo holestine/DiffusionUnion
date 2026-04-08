@@ -2,8 +2,11 @@ opencv-python
 sentencepiece
 protobuf
 accelerate
+#torch==2.5.1
+#torchvision==0.20.1
 xformers
-diffusers
-transformers
+diffusers>=0.28.0
+transformers>=4.38.0
+numpy>=2.2.6
 matplotlib
 peft
