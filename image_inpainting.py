@@ -108,8 +108,11 @@ class inpainting_ui:
         # Create a control for entering the generator value
         self.generator_entry = create_number_control(toolbar, 1, 'Generator', 'Different int values produce different results.', min=1)
 
-        # Create a control for entering the generator value
-        self.inference_steps_entry = create_number_control(toolbar, 200, 'Inference Steps', 'Higher values produce better images but take longer.', min=1, max=999)
+        # Create a control for entering the inference steps
+        self.inference_steps_entry = create_number_control(toolbar, 50, 'Inference Steps', 'Higher values produce better images but take longer.', min=1, max=999)
+
+        # Create a control for entering the strength value
+        self.strength_entry = create_number_control(toolbar, 0.8, 'Strength', 'How strongly the model modifies the masked area. Lower values preserve more of the original.', increment=0.05, type=float, min=0.01, max=1.0)
 
         # Create a button to generate the image
         self.generate_button = create_toolbar_button(toolbar, "Generate", self.generate, 'Generate a new image')
@@ -137,6 +140,10 @@ class inpainting_ui:
     def checkpoint_selection_callback(self, *args):
         self.update_controls()
         
+    def _set_steps(self, value):
+        self.inference_steps_entry.delete(0, END)
+        self.inference_steps_entry.insert(0, str(value))
+
     def update_controls(self):
         checkpoint = self.checkpoint.get()
         if checkpoint == "Stable Diffusion 1.5" or checkpoint == "Stable Diffusion XL 1.5":
@@ -146,6 +153,8 @@ class inpainting_ui:
             self.blur_entry['state'] = NORMAL
             self.generator_entry['state'] = NORMAL
             self.inference_steps_entry['state'] = NORMAL
+            self.strength_entry['state'] = NORMAL
+            self._set_steps(50)
         elif checkpoint == "Kandinsky 2.2":
             self.negative_prompt["state"] = NORMAL
             self.negative_prompt['bg'] = '#FFFFFF'
@@ -153,6 +162,7 @@ class inpainting_ui:
             self.blur_entry['state'] = DISABLED
             self.generator_entry['state'] = DISABLED
             self.inference_steps_entry['state'] = DISABLED
+            self.strength_entry['state'] = DISABLED
         elif checkpoint == "FLUX.1 Fill":
             self.negative_prompt['state'] = DISABLED
             self.negative_prompt['bg'] = '#D3D3D3'
@@ -160,8 +170,8 @@ class inpainting_ui:
             self.blur_entry['state'] = NORMAL
             self.generator_entry['state'] = NORMAL
             self.inference_steps_entry['state'] = NORMAL
-            self.inference_steps_entry.delete(0, END)
-            self.inference_steps_entry.insert(0, '50')
+            self.strength_entry['state'] = DISABLED
+            self._set_steps(50)
 
         if len(self.history) >= 1:
             self.undo_button["state"] = NORMAL
@@ -181,7 +191,11 @@ class inpainting_ui:
         if len(self.history) > 0:
             self.canvas.delete("all")
             self.canvas_bg = PhotoImage(file=self.history[-1])
-            self.width, self.height = self.canvas_bg.width(), self.canvas_bg.height()
+            new_width, new_height = self.canvas_bg.width(), self.canvas_bg.height()
+            if new_width != self.width or new_height != self.height:
+                self.width, self.height = new_width, new_height
+                self.mask = self.mask.resize((self.width, self.height), Image.LANCZOS)
+                self.mask_editor = ImageDraw.Draw(self.mask)
             self.canvas.config(width=self.width, height=self.height)
             self.canvas.create_image(0, 0, image=self.canvas_bg, anchor=NW)
         else:
@@ -315,10 +329,11 @@ class inpainting_ui:
         # Get all necessary arguments from UI
         prompt              = self.prompt.get(         '1.0', 'end-1 chars')
         negative_prompt     = self.negative_prompt.get('1.0', 'end-1 chars')
-        generator           = int(self.generator_entry.get())
+        generator_seed      = int(self.generator_entry.get())
         blur_factor         = int(self.blur_entry.get())
         num_inference_steps = int(self.inference_steps_entry.get())
-        model_name = self.checkpoint.get()
+        strength            = float(self.strength_entry.get())
+        model_name          = self.checkpoint.get()
 
         if len(self.history) > 0:
             init_image = load_image(self.history[-1])
@@ -333,13 +348,14 @@ class inpainting_ui:
             self._apply_offload(pipe, vram_needed_gb=10)
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
-            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
-            generator = torch.Generator("cuda").manual_seed(generator)
+            mask = pipe.mask_processor.blur(self.mask.resize(init_image.size), blur_factor=blur_factor)
+            generator = torch.Generator("cpu").manual_seed(generator_seed)
 
             image = pipe(prompt=prompt,
                          image=init_image,
-                         mask_image=self.mask,
+                         mask_image=mask,
                          generator=generator,
+                         strength=strength,
                          num_inference_steps=num_inference_steps).images[0]
         elif model_name == "Stable Diffusion XL 1.5":
             pipe = AutoPipelineForInpainting.from_pretrained(
@@ -348,13 +364,14 @@ class inpainting_ui:
             self._apply_offload(pipe, vram_needed_gb=12)
             if self.use_efficient_attention:
                 pipe.enable_xformers_memory_efficient_attention()
-            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
-            generator = torch.Generator("cuda").manual_seed(generator)
+            mask = pipe.mask_processor.blur(self.mask.resize(init_image.size), blur_factor=blur_factor)
+            generator = torch.Generator("cpu").manual_seed(generator_seed)
 
             image = pipe(prompt=prompt,
                          image=init_image,
-                         mask_image=self.mask,
+                         mask_image=mask,
                          generator=generator,
+                         strength=strength,
                          num_inference_steps=num_inference_steps).images[0]
         elif model_name == "Kandinsky 2.2":
             pipe = AutoPipelineForInpainting.from_pretrained(
@@ -367,25 +384,29 @@ class inpainting_ui:
             image = pipe(prompt=prompt,
                          negative_prompt=negative_prompt,
                          image=init_image,
-                         mask_image=self.mask).images[0]
+                         mask_image=self.mask.resize(init_image.size)).images[0]
         elif model_name == "FLUX.1 Fill":
             pipe = FluxFillPipeline.from_pretrained(
                 "black-forest-labs/FLUX.1-Fill-dev", torch_dtype=torch.bfloat16
             )
             self._apply_offload(pipe, vram_needed_gb=24)
-            self.mask = pipe.mask_processor.blur(self.mask, blur_factor=blur_factor)
-            generator = torch.Generator("cpu").manual_seed(generator)
+            mask = pipe.mask_processor.blur(self.mask.resize(init_image.size), blur_factor=blur_factor)
+            generator = torch.Generator("cpu").manual_seed(generator_seed)
 
-            image = pipe(
+            flux_output = pipe(
                 prompt=prompt,
                 image=init_image,
-                mask_image=self.mask,
-                height=self.height,
-                width=self.width,
+                mask_image=mask,
+                height=init_image.height,
+                width=init_image.width,
                 num_inference_steps=num_inference_steps,
                 guidance_scale=30,
                 generator=generator,
             ).images[0]
+            # Composite: use FLUX output only inside the mask, keep original elsewhere.
+            # This prevents FLUX's transformer from subtly degrading unmasked regions.
+            binary_mask = self.mask.resize(init_image.size).convert("L")
+            image = Image.composite(flux_output, init_image, binary_mask)
         else:
             print("Specify a supported model.\n")
             return
