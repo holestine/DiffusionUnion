@@ -93,7 +93,7 @@ hugging_face_token = "hf_..."
 |![](./assets/creature.png)|![](./assets/snake.png)|![](./assets/river_cat_1.png)|
 |![](./assets/ufo.png)|![](./assets/ship.png)|![](./assets/river_cat_2.png)|
 |![](./assets/monkey_space_bug.png)|![](./assets/ship2.png)|![](./assets/northern_lights.png)|
-|![](./assets/flux_town.png)|![](./assets/lab.png)|![](./assets/crowd.png)|
+|![](./assets/flux_town.png)|![](./assets/lab.png)|![](./assets/market.png)|
 
 The images in this gallery were produced through the multi-step pipeline: text-to-image generation → inpainting to refine regions → depth-conditioned regeneration → LDM super resolution.
 

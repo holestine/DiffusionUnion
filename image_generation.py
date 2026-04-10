@@ -11,7 +11,7 @@ import time
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, message=".*upcast_vae.*")
 warnings.filterwarnings("ignore", message=".*Siglip2ImageProcessorFast.*")
-from controls import create_toolbar_button
+from controls import create_toolbar_button, create_number_control
 from huggingface_hub import login
 from private import hugging_face_token
 from transformers import pipeline
@@ -99,6 +99,9 @@ class image_generation_ui:
         checkpoint_menu.pack(side=LEFT, fill=X, expand=True)
         checkpoint_frame.pack(side=LEFT, fill=X, expand=False)
 
+        # Create a control for entering the generator seed
+        self.generator_entry = create_number_control(toolbar, 0, 'Generator', 'Different int values produce different results.', min=0)
+
         # Create a button to load an image
         self.load_button = create_toolbar_button(toolbar, 'Load Image', self.load_background, 'Open an image')
 
@@ -156,8 +159,9 @@ class image_generation_ui:
 
     def generate_thread(self):
         # Get all necessary arguments from UI
-        prompt     = self.prompt.get('1.0', 'end-1 chars')
-        model_name = self.checkpoint.get()
+        prompt         = self.prompt.get('1.0', 'end-1 chars')
+        model_name     = self.checkpoint.get()
+        generator_seed = int(self.generator_entry.get())
 
         if model_name == "Stable Diffusion XL":
             # https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
@@ -184,7 +188,7 @@ class image_generation_ui:
                 guidance_scale=3.5,
                 num_inference_steps=50,
                 max_sequence_length=512,
-                generator=torch.Generator("cpu").manual_seed(0)
+                generator=torch.Generator("cpu").manual_seed(generator_seed)
             ).images[0]
         elif model_name == "FLUX.1-schnell":
             # https://huggingface.co/black-forest-labs/FLUX.1-schnell
@@ -197,7 +201,7 @@ class image_generation_ui:
                 guidance_scale=0.0,
                 num_inference_steps=4,
                 max_sequence_length=256,
-                generator=torch.Generator("cpu").manual_seed(0)
+                generator=torch.Generator("cpu").manual_seed(generator_seed)
             ).images[0]
         elif model_name == "Kolors":
             pipe = KolorsPipeline.from_pretrained("Kwai-Kolors/Kolors-diffusers", torch_dtype=torch.float16, variant="fp16")
