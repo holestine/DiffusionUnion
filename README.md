@@ -20,11 +20,12 @@ A desktop application that unifies multiple state-of-the-art generative AI model
 ## Features
 
 ### Image Generation
-Text-to-image generation across six model checkpoints selectable at runtime:
+Text-to-image generation across six model checkpoints selectable at runtime, with a configurable generator seed for reproducibility and variation:
 
 - **Stable Diffusion XL** — DPMSolverMultistepScheduler
 - **Stable Diffusion 3** — classifier-free guidance with negative prompt
 - **FLUX.1-dev** — Black Forest Labs' flow-matching model, bfloat16, up to 1024×1024
+- **FLUX.1-schnell** — distilled 4-step variant for fast generation
 - **Kolors** — Kwai's bilingual model with Karras sigma DPM++ scheduling
 - **Playground v2.5** — EDMDPMSolverMultistepScheduler for aesthetic quality
 - **DiffusionLight chrome ball** — LoRA + ControlNet depth-conditioned inpainting to synthesize a physically-based light probe in-scene; uses Intel DPT for monocular depth estimation and procedural sphere masking via PyTorch tensor math
@@ -32,11 +33,11 @@ Text-to-image generation across six model checkpoints selectable at runtime:
 ### Inpainting
 Draw a freehand mask directly on the canvas to target regions for model-driven edits:
 
-- **FLUX.1-Fill** — Black Forest Labs' dedicated inpainting model; bfloat16, guidance scale 30, significantly better mask coherence and prompt fidelity than SD-based inpainting
-- **Stable Diffusion 1.5 / XL** — `AutoPipelineForInpainting` with configurable mask blur, seed control, and inference step budget
+- **FLUX.1-Fill** — Black Forest Labs' dedicated inpainting model; bfloat16, guidance scale 30, significantly better mask coherence and prompt fidelity than SD-based inpainting. Output is composited back onto the original image pixel-for-pixel outside the mask to prevent unmasked region degradation.
+- **Stable Diffusion 1.5 / XL** — `AutoPipelineForInpainting` with configurable mask blur, strength, seed, and inference step budget
 - **Kandinsky 2.2** — prior + decoder architecture with negative prompt support
 - xformers memory-efficient attention auto-enabled on PyTorch < 2.0 for older GPU compatibility
-- Mask blur via `pipe.mask_processor.blur` for seamless edge blending
+- Mask is automatically resized to match the image at inference time, keeping drawn strokes accurate regardless of canvas size changes
 
 ### Depth-Conditioned Generation
 Uses **Stable Diffusion 2 Depth** (`StableDiffusionDepth2ImgPipeline`) to extract a monocular depth map from the source image and use it as a structural prior, preserving scene geometry while regenerating content.
@@ -95,7 +96,10 @@ hugging_face_token = "hf_..."
 |![](./assets/monkey_space_bug.png)|![](./assets/ship2.png)|![](./assets/northern_lights.png)|
 |![](./assets/flux_town.png)|![](./assets/lab.png)|![](./assets/gogh.png)|
 
-The images in this gallery were produced through the multi-step pipeline: text-to-image generation → inpainting to refine regions → depth-conditioned regeneration → LDM super resolution.
+Sample workflows used to produce these images:
+- Text-to-image → inpainting to refine regions → depth-conditioned regeneration → super resolution
+- Text-to-image → FLUX.1-Fill inpainting → SD x4 upscaling
+- Segmentation → BLIP captioning → prompt-guided inpainting
 
 ---
 
