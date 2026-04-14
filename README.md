@@ -10,9 +10,9 @@ A desktop application that unifies multiple state-of-the-art generative AI model
 |---|---|
 | **Deep Learning** | PyTorch, HuggingFace Diffusers, HuggingFace Transformers |
 | **GPU Acceleration** | CUDA, FP16 precision, xformers memory-efficient attention, CPU offloading |
-| **Models** | Stable Diffusion 1.5/2-Depth/XL, SD3, FLUX.1-dev/schnell, FLUX.1-Fill, Kolors, Playground v2.5, Kandinsky 2.2 |
-| **Vision** | SAM (Segment Anything), Intel DPT depth estimation, BLIP image captioning, LDM Super Resolution, SD x4 Upscaler |
-| **Conditioning** | ControlNet (depth-conditioned SDXL), LoRA weight loading and fusion |
+| **Models** | Stable Diffusion 1.5/2-Depth/XL, SD3, FLUX.1-dev/schnell/Fill/Redux, Kolors, Playground v2.5, Kandinsky 2.2 |
+| **Vision** | SAM (Segment Anything), Intel DPT depth estimation, BLIP image captioning, BiRefNet background removal, LDM Super Resolution, SD x4 Upscaler |
+| **Conditioning** | FLUX ControlNet (depth), IP-Adapter (style/content reference), LoRA weight loading and fusion |
 | **UI** | Python Tkinter, multithreaded background inference, PIL/Pillow, NumPy, Matplotlib |
 
 ---
@@ -20,22 +20,26 @@ A desktop application that unifies multiple state-of-the-art generative AI model
 ## Features
 
 ### Image Generation
-Text-to-image generation across six model checkpoints selectable at runtime, with a configurable generator seed for reproducibility and variation:
+Text-to-image generation with a configurable generator seed, output resolution presets up to 4K, and optional reference image input for conditioning:
 
 - **Stable Diffusion XL** — DPMSolverMultistepScheduler
 - **Stable Diffusion 3** — classifier-free guidance with negative prompt
-- **FLUX.1-dev** — Black Forest Labs' flow-matching model, bfloat16, up to 1024×1024
+- **FLUX.1-dev** — Black Forest Labs' flow-matching model, bfloat16
 - **FLUX.1-schnell** — distilled 4-step variant for fast generation
+- **FLUX.1-dev ControlNet Depth** — depth-conditioned generation via `InstantX/FLUX.1-dev-Controlnet-Depth`; load a reference image to extract structural depth prior
+- **FLUX.1-dev IP-Adapter** — style/content transfer from a reference image via `XLabs-AI/flux-ip-adapter`; controllable influence scale
+- **FLUX.1-Redux** — image variation pipeline; uses `FluxPriorReduxPipeline` to encode a reference image then generates variations with FLUX.1-dev
 - **Kolors** — Kwai's bilingual model with Karras sigma DPM++ scheduling
 - **Playground v2.5** — EDMDPMSolverMultistepScheduler for aesthetic quality
 - **DiffusionLight chrome ball** — LoRA + ControlNet depth-conditioned inpainting to synthesize a physically-based light probe in-scene; uses Intel DPT for monocular depth estimation and procedural sphere masking via PyTorch tensor math
 
-### Inpainting
+### Inpainting & Outpainting
 Draw a freehand mask directly on the canvas to target regions for model-driven edits:
 
 - **FLUX.1-Fill** — Black Forest Labs' dedicated inpainting model; bfloat16, guidance scale 30, significantly better mask coherence and prompt fidelity than SD-based inpainting. Output is composited back onto the original image pixel-for-pixel outside the mask to prevent unmasked region degradation.
 - **Stable Diffusion 1.5 / XL** — `AutoPipelineForInpainting` with configurable mask blur, strength, seed, and inference step budget
 - **Kandinsky 2.2** — prior + decoder architecture with negative prompt support
+- **Outpainting** — expands the canvas in any direction (Left, Right, Top, Bottom, All) using FLUX.1-Fill; configurable expansion amount in pixels, original pixels composited back after generation
 - xformers memory-efficient attention auto-enabled on PyTorch < 2.0 for older GPU compatibility
 - Mask is automatically resized to match the image at inference time, keeping drawn strokes accurate regardless of canvas size changes
 
@@ -50,9 +54,10 @@ Two 4× upscaling models selectable at runtime:
 
 Both support mask-based region cropping to target a specific area of the image.
 
-### Segmentation & Captioning
+### Segmentation, Captioning & Background Removal
 - **Segment Anything (SAM ViT-Huge)** — automatic mask generation via `points_per_batch` grid sampling; custom RGBA compositing renders multi-mask overlays with per-mask random colors and configurable transparency
 - **BLIP** (`Salesforce/blip-image-captioning-base`) — image captioning via `BlipForConditionalGeneration`, result injected back into the prompt field
+- **Background Removal** — one-click background removal via `rembg` (BiRefNet); outputs RGBA PNG with transparent background
 
 ---
 
@@ -98,8 +103,10 @@ hugging_face_token = "hf_..."
 
 Sample workflows used to produce these images:
 - Text-to-image → inpainting to refine regions → depth-conditioned regeneration → super resolution
-- Text-to-image → FLUX.1-Fill inpainting → SD x4 upscaling
+- Text-to-image → FLUX.1-Fill inpainting → outpainting → SD x4 upscaling
 - Segmentation → BLIP captioning → prompt-guided inpainting
+- Reference image → FLUX.1-Redux variation → FLUX.1-Fill inpainting refinement
+- Background removal → FLUX ControlNet depth inpainting → super resolution
 
 ---
 

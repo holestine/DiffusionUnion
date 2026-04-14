@@ -37,16 +37,19 @@ class DiffusionUnionUI:
         self.tabControl = ttk.Notebook(root)
 
         generation_tab = Frame(self.tabControl)
-        self.generation_tab = generation.image_generation_ui(generation_tab, self.history)
-        self.tabControl.add(generation_tab, text=GENERATION_TAB_NAME) 
+        self.generation_tab = generation.image_generation_ui(generation_tab, self.history, width=1440, height=810)
+        self.tabControl.add(generation_tab, text=GENERATION_TAB_NAME)
 
         segmentation_tab = Frame(self.tabControl)
-        self.segmentation_tab = segmentation.image_segmentation_ui(segmentation_tab, self.history)
-        self.tabControl.add(segmentation_tab, text=SEGMENTATION_TAB_NAME) 
+        self.segmentation_tab = segmentation.image_segmentation_ui(segmentation_tab, self.history, width=1440, height=810)
+        self.tabControl.add(segmentation_tab, text=SEGMENTATION_TAB_NAME)
 
         inpainting_tab = Frame(self.tabControl)
-        self.inpainting_tab = inpainting.inpainting_ui(inpainting_tab, self.history)
-        self.tabControl.add(inpainting_tab, text=INPAINTING_TAB_NAME) 
+        self.inpainting_tab = inpainting.inpainting_ui(inpainting_tab, self.history, width=1440, height=810)
+        self.tabControl.add(inpainting_tab, text=INPAINTING_TAB_NAME)
+
+        # Wire segmentation tab to inpainting so clicking segments updates the mask directly
+        self.segmentation_tab.inpainting_tab = self.inpainting_tab
 
         #depth_tab = Frame(self.tabControl)
         #self.depth_tab = depth.image_depth_ui(depth_tab, self.history)
@@ -86,6 +89,8 @@ class DiffusionUnionUI:
 if __name__ == "__main__":
     # Create Tk UI
     root = Tk()
+    #root.state('zoomed')
+    root.attributes('-zoomed', True)
     app = DiffusionUnionUI(root)
     root.mainloop()
 

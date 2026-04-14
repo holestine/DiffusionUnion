@@ -1,6 +1,19 @@
 from tkinter import *
 from idlelib.tooltip import Hovertip
+from PIL import Image, ImageTk
 import numpy as np
+
+def load_display_image(canvas, path):
+    """Load an image from path, scale it to fit 80% of the screen, and display it on canvas.
+    Returns the (display_width, display_height) of the scaled image."""
+    img = Image.open(path)
+    screen_w = canvas.winfo_screenwidth()
+    screen_h = canvas.winfo_screenheight()
+    img.thumbnail((int(screen_w * 0.8), int(screen_h * 0.8)), Image.LANCZOS)
+    canvas._display_image = ImageTk.PhotoImage(img)  # keep reference to prevent GC
+    canvas.config(width=img.width, height=img.height)
+    canvas.create_image(0, 0, image=canvas._display_image, anchor=NW)
+    return img.width, img.height
 
 def create_number_control(parent, default, text, tip="", increment=1, type=int, min=-np.inf, max=np.inf):
 
