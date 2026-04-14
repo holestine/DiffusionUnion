@@ -1,7 +1,23 @@
+import threading
+import time
 from tkinter import *
 from idlelib.tooltip import Hovertip
 from PIL import Image, ImageTk
 import numpy as np
+
+
+class TabBase:
+    """Shared behaviour for all tab UI classes."""
+
+    def run(self, fn):
+        """Run fn in a background daemon thread."""
+        threading.Thread(target=fn, daemon=True).start()
+
+    def update_canvas_image(self, image):
+        self.history.append('history/{}.png'.format(time.time()))
+        image.save(self.history[-1])
+        self.refresh_ui()
+
 
 def load_display_image(canvas, path):
     """Load an image from path, scale it to fit 80% of the screen, and display it on canvas.
@@ -30,25 +46,25 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
     def filter_decimals_only(value):
         if value == "":
             return True
-        
+
         try:
             value = float(value)
             if value >= min and value <= max:
                 return True
         except:
             return False
-        
+
         return False
 
     def filter_ints_only(value):
         if value == "":
             return True
-        
+
         if str.isdigit(value):
             value = int(value)
             if value >= min and value <= max:
                 return True
-        
+
         return False
 
     def verify_valid_value(event):
@@ -71,7 +87,7 @@ def create_number_control(parent, default, text, tip="", increment=1, type=int, 
     entry = Entry(frame, width=width, validate='all', validatecommand=(parent.register(event), '%P'), textvariable=value)
     entry.pack(side=LEFT, fill=BOTH, expand=True)
     entry.bind("<FocusOut>", verify_valid_value)
-        
+
     # Create a button to increase the value
     Button(frame, text="+", command=increase).pack(side=LEFT, fill=BOTH, expand=True)
     frame.pack(side=LEFT, fill=BOTH, expand=False)
